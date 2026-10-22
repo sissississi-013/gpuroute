@@ -120,6 +120,9 @@ def approve(job_id, approve=True):
     ledger.record("approved", job=job_id, budget_usd=job["budget_usd"], by="human")
     job["state"] = "launching"
     ledger.save_job(job)
+    if job.get("kind") == "script":
+        _start_modal_script(job)
+        return {"ok": True, "state": "running", "job": _public(job), "message": f"Running on Modal {job['gpu']}."}
     _start(job)
     return {"ok": True, "state": job["state"], "job": _public(job), "message": _launch_message(job)}
 
@@ -336,7 +339,7 @@ MAX_UPLOAD = 50 * 1024 * 1024
 
 
 def run_workload(script, deps=(), args=(), files=(), title=None, needs_gpu=True, min_vram_gb=None,
-                 max_minutes=15, target="auto", requested_by="agent"):
+                 max_minutes=15, target="auto", requested_by="agent", budget_usd=1.0):
     """script: path to a .py file or inline Python. files: local input files copied next to it.
     The script should write results into ./out (or $GPUROUTE_OUT); they come back to this machine."""
     from . import pool
@@ -353,6 +356,10 @@ def run_workload(script, deps=(), args=(), files=(), title=None, needs_gpu=True,
         return {"ok": False, "error": f"input files not found: {missing}"}
     if sum(Path(f).stat().st_size for f in files) > MAX_UPLOAD:
         return {"ok": False, "error": "input files exceed 50 MB; pass URLs the script downloads instead"}
+
+    if target.startswith("modal"):
+        return _workload_on_modal(code, list(deps), list(args), files, title, target, max_minutes,
+                                  budget_usd, requested_by)
 
     # Pick where to run: idle shared nodes first (they'd otherwise sit unused, and it keeps
     # this machine free), then this machine.
@@ -464,6 +471,11 @@ def _script_status(job):
             _settle(job, "stopped_at_budget", job.get("gpu_seconds", 0))
         elif last("finished"):
             _settle(job, "completed", job.get("gpu_seconds", 0))
+        elif "payment method" in text.lower():
+            from .providers import _save
+            _save("modal", ready=False, blocked_on="payment_method")
+            _settle(job, "failed", 0, error="Modal needs a payment method before it runs GPUs (still paid from "
+                                             "the $30/mo free credits). Call connect_provider('modal').")
         else:
             _settle(job, "failed", job.get("gpu_seconds", 0), error=_tail(text))
     ledger.save_job(job)
@@ -472,3 +484,63 @@ def _script_status(job):
     if job["state"] == "running":
         out["log_tail"] = _tail(text, 6)
     return out
+
+
+def _workload_on_modal(code, deps, args, files, title, target, max_minutes, budget_usd, requested_by):
+    """target: 'modal' (cheapest GPU) or 'modal:<GPU>' e.g. modal:H100, modal:T4."""
+    from .providers import known
+    gpu = target.split(":", 1)[1] if ":" in target else "T4"
+    match = next((k for k in MODAL if k.lower() == gpu.lower()), None)
+    if not match:
+        return {"ok": False, "error": f"unknown Modal GPU {gpu!r}; choose from {', '.join(MODAL)}"}
+    if known("modal").get("ready") is False:
+        return {"ok": False, "error": f"Modal isn't set up yet (blocked on {known('modal').get('blocked_on')}). "
+                                      "Call connect_provider('modal'): it opens the one page the user needs."}
+    modal_gpu, per_s = MODAL[match]
+    cfg, wal = ledger.config(), ledger.wallet()
+    cap_s = int(min(max_minutes * 60, budget_usd / per_s))
+    if budget_usd > cfg["max_job_usd"] or budget_usd > wal["available_usd"]:
+        return {"ok": False, "error": f"budget ${budget_usd} exceeds the per-job cap or remaining allowance"}
+    job_id = time.strftime("%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
+    d = ledger.JOBS / job_id
+    d.mkdir(parents=True, exist_ok=True)
+    job = {"id": job_id, "kind": "script", "created": time.time(), "title": title, "model": title,
+           "deps": deps, "args": args, "files": [Path(f).name for f in files], "provider": "modal",
+           "gpu": match, "modal_gpu": modal_gpu, "price_per_s": per_s, "budget_usd": budget_usd,
+           "est_cost_usd": round(cap_s * per_s, 4), "est_minutes": round(cap_s / 60, 1),
+           "hard_timeout_s": cap_s, "requested_by": requested_by, "state": "launching",
+           "actual_cost_usd": None, "artifact": str(d / "out"),
+           "data_leaving_device": f"script{' + ' + str(len(files)) + ' input file(s)' if files else ''} sent to Modal"}
+    spec = {"script": code, "args": args, "out_dir": str(d / "out"),
+            "files": {Path(f).name: base64.b64encode(Path(f).read_bytes()).decode() for f in files}}
+    (d / "spec.json").write_text(json.dumps(spec))
+    src = (TEMPLATES / "modal_script.py").read_text()
+    src = (src.replace("__APP_NAME__", f"gpuroute-{job_id}").replace("__GPU__", modal_gpu)
+           .replace("__TIMEOUT_S__", str(cap_s)).replace("__DEPS__", json.dumps(deps)))
+    (d / "app.py").write_text(src)
+    job["app_name"] = f"gpuroute-{job_id}"
+    if budget_usd > cfg["approval_threshold_usd"]:
+        job["state"] = "pending_approval"
+        ledger.save_job(job)
+        ledger.record("approval_requested", job=job_id, budget_usd=budget_usd, provider="modal", gpu=match,
+                      requested_by=requested_by)
+        return {"ok": True, "job_id": job_id, "state": "pending_approval",
+                "message": f"Budget ${budget_usd} is above the approval threshold. Ask the user to run: "
+                           f"gpuroute approve {job_id}"}
+    _start_modal_script(job)
+    return {"ok": True, "job_id": job_id, "provider": "modal", "gpu": match, "job": _public(job),
+            "message": f"Running '{title}' on Modal {match}. Modal hard-stops it after {cap_s}s "
+                       f"(= ${budget_usd} at ${per_s * 3600:.2f}/h). Poll job_status('{job_id}')."}
+
+
+def _start_modal_script(job):
+    d = ledger.JOBS / job["id"]
+    log = open(d / "run.log", "w")
+    proc = subprocess.Popen([shutil.which("modal") or "modal", "run", str(d / "app.py"), "--spec", str(d / "spec.json")],
+                            stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+                            env={**os.environ, "PYTHONUNBUFFERED": "1"})
+    job.update(pid=proc.pid, started=time.time(), state="running")
+    ledger.save_job(job)
+    ledger.record("launched", job=job["id"], kind="script", provider="modal", gpu=job["gpu"],
+                  budget_usd=job["budget_usd"], hard_timeout_s=job["hard_timeout_s"],
+                  data_leaving_device=job["data_leaving_device"], requested_by=job["requested_by"])

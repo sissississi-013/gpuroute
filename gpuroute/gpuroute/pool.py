@@ -136,7 +136,9 @@ def world_compute_summary():
         orbit = json.loads((geo / "orbit.json").read_text())
         out.append({"kind": "orbital", "name": "orbit",
                     "gpu": "; ".join(f"{o['name']}: {o['what']}" for o in orbit),
-                    "cost": "n/a", "available": False, "note": "not rentable yet; live positions from CelesTrak"})
+                    "cost": "mock market", "available": True,
+                    "note": "bookable via orbital_offers / book_orbital: real orbits + sunlight + ground passes, "
+                            "mock operator listings, jobs emulated on ground GPUs"})
     except Exception:
         pass
     return out

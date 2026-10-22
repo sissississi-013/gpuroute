@@ -12,7 +12,8 @@ from .quote import quote
 
 mcp = MCPServer("gpuroute", instructions=(
     "Use gpuroute whenever a task needs GPU or heavy compute: training, fine-tuning, transcription, "
-    "embeddings, image/video generation, rendering, batch inference. Call compute_map first to see every "
+    "embeddings, image/video generation, rendering, batch inference, and orbital compute (orbital_offers / "
+    "book_orbital). Call compute_map first to see every "
     "machine you can use (including teammates' idle GPUs), use run_workload for arbitrary scripts and "
     "quote_job/launch_job for LoRA fine-tunes. "
     "If a provider isn't ready, call connect_provider: it does the setup itself and only hands the user "
@@ -83,7 +84,7 @@ def compute_map() -> list:
 @mcp.tool()
 def run_workload(script: str, deps: list[str] = [], args: list[str] = [], files: list[str] = [],
                  needs_gpu: bool = True, min_vram_gb: float | None = None, max_minutes: float = 15,
-                 target: str = "auto") -> dict:
+                 target: str = "auto", budget_usd: float = 1.0) -> dict:
     """Run ANY Python workload (transcription, embeddings, image generation, rendering, batch
     inference, benchmarks, training) on the best available compute: an idle shared node first,
     then this machine. The node owner's rules (idle-only, minutes cap) are enforced on their side.
@@ -92,10 +93,15 @@ def run_workload(script: str, deps: list[str] = [], args: list[str] = [], files:
             (also $GPUROUTE_OUT); they are copied back here when the job ends.
     deps: pip packages the script needs. Leave empty to infer them from the script's imports.
     files: absolute paths of local input files to send along (≤50 MB total); they sit next to the script.
-    target: "auto", "local", or a node name from compute_map.
+    target: "auto" (idle shared node, then this machine), "local", a node name from compute_map, or a
+            cloud GPU: "modal:T4", "modal:L4", "modal:A10", "modal:L40S", "modal:A100-80GB", "modal:H100",
+            "modal:H200", "modal:B200". Pick the GPU the workload needs; quote_job helps size training.
+    budget_usd: hard cap for cloud GPUs (becomes the provider's timeout); above the user's threshold it
+                waits for human approval. Free targets ignore it.
     """
     return jobs.run_workload(script, deps, args, files, needs_gpu=needs_gpu, min_vram_gb=min_vram_gb,
-                             max_minutes=max_minutes, target=target, requested_by="agent:mcp")
+                             max_minutes=max_minutes, target=target, requested_by="agent:mcp",
+                             budget_usd=budget_usd)
 
 
 @mcp.tool()
@@ -113,6 +119,26 @@ def read_output(job_id: str, filename: str, max_chars: int = 20000) -> dict:
         return {"file": str(f), "bytes": f.stat().st_size, "content": text[:max_chars],
                 "truncated": len(text) > max_chars}
     return {"file": str(f), "bytes": f.stat().st_size, "note": "binary file; use the path"}
+
+
+@mcp.tool()
+def orbital_offers(hours: float = 12) -> dict:
+    """Satellite compute marketplace: GPU time aboard satellites (only while sunlit, for solar power) and
+    ground-station relay passes to downlink results, from different operators. Orbits, sunlight and passes
+    are computed live from real orbital elements; operator listings and prices are mock (no operator sells
+    this by API yet), so booked jobs are emulated on ground GPUs following the satellite's real timeline."""
+    from . import orbital
+    return orbital.offers(hours)
+
+
+@mcp.tool()
+def book_orbital(offer_id: str, script: str, deps: list[str] = [], args: list[str] = [],
+                 files: list[str] = [], budget_usd: float = 1.0, max_minutes: float = 10) -> dict:
+    """Book a compute offer from orbital_offers (type "compute", open now or within 20 min) and run a
+    Python script in that satellite's window. Returns the booking (window, mock price, downlink pass)
+    and a job_id to poll with job_status. Same script contract as run_workload."""
+    from . import orbital
+    return orbital.book(offer_id, script, deps, args, files, budget_usd, max_minutes, requested_by="agent:mcp")
 
 
 @mcp.tool()

@@ -356,7 +356,7 @@ def cmd_map(a):
 def cmd_run(a):
     r = jobs.run_workload(a.script, a.dep or [], a.args or [], a.file or [], needs_gpu=not a.cpu_ok,
                           min_vram_gb=a.min_vram, max_minutes=a.max_minutes, target=a.on,
-                          requested_by="human:cli")
+                          requested_by="human:cli", budget_usd=a.budget)
     if not r["ok"]:
         con.print(f"[red bold]not started:[/] {r['error']}")
         for t in r.get("tried", []):
@@ -373,6 +373,34 @@ def cmd_run(a):
             con.print(f"results in [bold]{ledger.JOBS / r['job_id'] / 'out'}[/]")
     else:
         con.print(f"watch it:  gpuroute status {r['job_id']} --watch")
+
+
+def cmd_orbit(a):
+    from . import orbital
+    if a.action == "book":
+        r = orbital.book(a.offer, a.script, budget_usd=a.budget, max_minutes=a.max_minutes, requested_by="human:cli")
+        if not r.get("ok"):
+            con.print(f"[red]{r['error']}[/]")
+            return 1
+        con.print(f"[green]{r['message']}[/]")
+        return
+    o = orbital.offers(a.hours)
+    for sat in dict.fromkeys(x["satellite"] for x in o["offers"]):
+        pos = next(x for x in o["offers"] if x["satellite"] == sat and x["type"] == "position")
+        con.print(f"\n[bold]{sat}[/]  {pos['alt_km']} km up · {pos['lat']}, {pos['lon']} · "
+                  f"{'[yellow]sunlit[/]' if pos['sunlit_now'] else '[blue]in eclipse[/]'}  [dim]{pos['fact']}[/]")
+        t = Table("offer", "type", "operator", "window", "", "price / capacity", "downlink")
+        for x in o["offers"]:
+            if x["satellite"] != sat or x["type"] == "position":
+                continue
+            if x["type"] == "compute":
+                t.add_row(x["offer_id"], "compute", x["operator"], x["window"], x["hardware"],
+                          f"${x['usd_per_gpu_min']}/GPU-min", x["next_downlink"])
+            else:
+                t.add_row(x["offer_id"], "relay", x["operator"], x["window"], f"{x['max_elevation_deg']}° max",
+                          f"{x['capacity_gb']} GB @ ${x['usd_per_gb']}/GB", "")
+        con.print(t)
+    con.print(f"[dim]{o['note']}[/]")
 
 
 def cmd_mcp_config(a):
@@ -427,10 +455,18 @@ def main():
     p.add_argument("args", nargs="*")
     p.add_argument("--dep", action="append", help="pip dependency (repeatable); default: inferred from imports")
     p.add_argument("--file", action="append", help="input file to send along (repeatable)")
-    p.add_argument("--on", default="auto", help="auto, local, or a node name")
+    p.add_argument("--on", default="auto", help="auto, local, a node name, or modal:<GPU> (e.g. modal:H100)")
+    p.add_argument("--budget", type=float, default=1.0, help="hard $ cap for cloud GPUs")
     p.add_argument("--min-vram", type=float)
     p.add_argument("--max-minutes", type=float, default=15)
     p.add_argument("--cpu-ok", action="store_true", help="job doesn't need a GPU")
+    p = sub.add_parser("orbit", help="satellite compute marketplace: gpuroute orbit [book <offer> script.py]")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "book"])
+    p.add_argument("offer", nargs="?")
+    p.add_argument("script", nargs="?")
+    p.add_argument("--hours", type=float, default=12)
+    p.add_argument("--budget", type=float, default=1.0)
+    p.add_argument("--max-minutes", type=float, default=10)
     p = sub.add_parser("setup", help="provider readiness, or connect one: gpuroute setup modal")
     p.add_argument("provider", nargs="?")
     p.add_argument("--no-open", action="store_true", help="don't open the browser")
@@ -443,7 +479,7 @@ def main():
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "init": cmd_init, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "init": cmd_init, "orbit": cmd_orbit, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 
