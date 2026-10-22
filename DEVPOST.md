@@ -2,7 +2,7 @@
 
 **Project name:** gpuroute
 
-**Tagline:** Your agent can write training code, but it can't safely run it. gpuroute sizes, prices and launches GPU training jobs for AI agents, free options first, under a budget they can't raise.
+**Tagline:** The cheapest GPU is the one you already have and aren't using. gpuroute gives AI agents a map of every idle GPU they can use, from teammates' machines to free tiers and the spare-GPU market, and runs any workload there under owner rules and a hard budget.
 
 **Track:** Hacking with Public Data APIs
 
@@ -21,6 +21,10 @@ Coding agents can write a fine-tuning script in seconds. The moment it needs a G
 
 ## What it does
 gpuroute is an **MCP server + CLI + local dashboard**:
+- **gpuroute share**: one command turns any machine (a teammate's laptop, a gaming PC, a lab box) into a node. The owner's rules are enforced on their machine: idle-only (read from the GPU driver), a minutes cap, one job at a time, and every job printed in their terminal
+- **compute_map**: every resource the agent can use and how busy it is right now: this machine, shared nodes, Modal, the live Vast.ai spare-GPU market (1,650 GPUs listed today), Kaggle and Colab
+- **run_workload**: run ANY Python workload (transcription, embeddings, image generation, rendering, batch inference) with its own deps (installed by uv) and input files on the best idle node; outputs come back
+- **read_output**: the agent reads results without extra file permissions
 - **estimate_job**: VRAM needed (weights/optimizer, activations, overhead) and time on 16 GPUs, before renting anything
 - **quote_job**: ranks every way to run the job by what you'd actually pay: your own Mac/GPU ($0, private), Kaggle, Colab, Modal (free credits), and the **live Vast.ai GPU market**
 - **launch_job**: runs a LoRA fine-tune under a hard budget, or waits for human approval above a threshold
@@ -57,6 +61,7 @@ Agents get an allowance, never credentials. There is deliberately no MCP tool to
 - Modal needs a payment method before GPU use. connect_provider detects this in 3 seconds without spending anything
 
 ## Accomplishments
+- A real agent, asked to "build a search index of my notes without hogging my laptop," checked the compute map, sent the job to a shared node and got 56 passages embedded on its GPU
 - A real agent (Claude Code) used it correctly on the first try: it quoted, picked the free local GPU, launched with a $1 cap and reported status
 - A real LoRA fine-tune on the M2 GPU: loss 2.75 → 2.23, $0.00, settled in the audit log
 - A 30-second cap stopped a job at 24 seconds, as designed

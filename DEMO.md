@@ -1,36 +1,39 @@
 # 5-minute demo script
 
-## Before you present (setup, ~2 min)
+## Setup (before presenting)
+**Iana's laptop** (see SHARE.md):
+```bash
+uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --name iana
+```
+Copy the `gpuroute nodes add iana http://… <token>` line it prints.
+
+**This Mac:**
 ```bash
 cd ~/national-renaissance-hackathon/gpuroute
-.venv/bin/gpuroute ui                  # dashboard opens at http://127.0.0.1:7311, keep it in a browser tab
-# Claude Code with gpuroute (in a second terminal):
-cd ~/national-renaissance-hackathon && claude    # .mcp.json in this folder loads gpuroute
+.venv/bin/gpuroute nodes add iana http://<iana-ip>:7400 <token>   # paste from Iana
+.venv/bin/gpuroute map                                            # iana should say usable: yes
+.venv/bin/gpuroute run examples/benchmark.py --dep torch --on iana   # warm-up: caches torch on Iana's machine
+.venv/bin/gpuroute ui                                             # dashboard tab
+cd .. && claude                                                   # Claude Code with gpuroute (.mcp.json here)
 ```
-Optional: fresh dashboard for the demo: `mv ~/.gpuroute/jobs ~/.gpuroute/jobs.bak && mv ~/.gpuroute/ledger.jsonl ~/.gpuroute/ledger.bak`
+Warm-up matters: the first run on Iana's machine downloads torch (~1–2 min). Also run `examples/embed.py` once there to cache sentence-transformers.
 
 ## Script
-**0:00 Slides 1–2 (45s).** "Agents write training code in seconds. When it needs a GPU: which one, which cloud, and would you give it your AWS keys?"
+**0:00 Slides 1–3 (60s).** "The cheapest GPU is the one you already have and aren't using." 35% cluster utilization, 1,650 spare GPUs right now, idle laptops everywhere. Agents can't see any of it.
 
-**0:45 Slide 3 (20s).** Four tools: estimate, quote, launch, status.
+**1:00 Live (2 min).** Iana's terminal visible. In Claude Code:
+> I have notes at /Users/sissi/national-renaissance-hackathon/MARKET_RESEARCH.md. Build a semantic search index of them on a GPU using gpuroute/examples/embed.py. Don't hog my laptop if there's spare compute.
 
-**1:05 Live, in Claude Code (2 min).** Type:
-> Fine-tune HuggingFaceTB/SmolLM2-360M-Instruct on mlabonne/guanaco-llama2-1k, 200 rows, seq len 256. Budget $1. Find the cheapest way and launch it.
+Narrate: compute_map → sees iana idle → run_workload ships script + file → **Iana's terminal prints the job** → results come back → agent reads demo_search.json via read_output. Show the dashboard: compute map, job, audit log.
 
-While it runs, narrate: it called quote_job (13 options ranked), picked this Mac at $0, launched with a $1 cap, and says what data leaves the device (none).
+**3:00 Owner control (30s).** Iana starts something heavy (or Ctrl-C): her node shows "not accepting" in the map, and the agent falls back to this machine. "The owner is always in control."
 
-Switch to the dashboard: running job, progress bar, loss curve filling in, audit log.
+**3:30 Slides: budget + setup + data (45s).** Paid compute: hard cap = provider timeout, approval above $2, connect_provider makes setup one click.
 
-**3:05 Guardrails (40s).** In Claude Code:
-> Now fine-tune Qwen/Qwen2.5-1.5B-Instruct on 1000 rows on a cloud GPU, budget $3.
+**4:15 Market + close (45s).**
 
-It hits the $2 approval threshold, and the job appears under **Needs your approval** on the dashboard. Click **Approve** or **Deny**. "The agent can't approve itself: there's no MCP tool for that." (If Modal has no card on file, this also shows connect_provider opening the billing page: one human step.)
-
-**3:45 Slides 6–8 (45s).** Three-layer budget, public data + responsible use, market gap.
-
-**4:30 Close (30s).** "Let agents train models. Keep the wallet." Q&A.
-
-## Backup if wifi dies
-- Models already cached: SmolLM2-135M, SmolLM2-360M, Qwen2.5-0.5B
-- Quotes fall back to the cached Vast/OpenRouter snapshot
-- CLI only: `gpuroute quote HuggingFaceTB/SmolLM2-360M-Instruct --examples 200 --seq-len 256 --budget 1`, then `gpuroute launch HuggingFaceTB/SmolLM2-360M-Instruct mlabonne/guanaco-llama2-1k --budget 1 --examples 200 --seq-len 256`, then `gpuroute status <id> --watch`
+## Fallback if Iana's machine can't connect (venue wifi isolation)
+Both on a phone hotspot. If still no luck, simulate on this Mac and say so:
+```bash
+.venv/bin/gpuroute share --name iana-sim --port 7400 --always &   # prints the add line
+```

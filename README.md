@@ -1,19 +1,39 @@
 # gpuroute
 
-**Your agent can write training code, but it can't safely run it.**
+**The cheapest GPU is the one you already have and aren't using.**
 
-It doesn't know which GPU a job needs, it can't compare providers, and you can't hand it your cloud account. gpuroute gives agents (Claude Code, Codex, Cursor, anything that speaks MCP) one tool to **size, price and launch** fine-tuning jobs, cheapest first, under a **spending allowance they cannot raise themselves**.
+Compute sits idle everywhere: teammates' laptops, the gaming PC at home, the lab workstation, unused cloud credits. Meanwhile agents only know about the one machine they run on. gpuroute gives agents (Claude Code, Codex, Cursor, anything that speaks MCP) a **map of every machine and provider they can use**, routes any GPU workload to the best idle one, and keeps spending and owner rules in human hands. Workloads include transcription, embeddings, image generation, rendering, batch inference and fine-tuning.
 
 Built for the National Renaissance Hackathon at super{set}. Track: **Hacking with Public Data APIs**. It is an MCP server and a CLI built on live public pricing and model data.
 
 ```
-agent ──MCP──▶ estimate_job ─▶ quote_job ─▶ launch_job ─▶ job_status
-                    │               │            │
-          VRAM + time per GPU   ranked options:  policy check ─▶ approval (human) ─▶ provider
-                                this Mac ($0) ·              hard timeout = budget / price
-                                Kaggle · Colab ·             (enforced by Modal itself)
-                                Modal · Vast.ai live
+                        ┌─ shared nodes: teammates' idle GPUs  (gpuroute share, owner rules)
+agent ──MCP──▶ compute_map ─┼─ this machine
+   │                    ├─ cloud: Modal ($30/mo free credits)
+   │                    ├─ spare-GPU market: Vast.ai live prices (1,600+ GPUs listed)
+   │                    └─ free tiers: Kaggle, Colab
+   ├──▶ run_workload(script, deps, files)  → best idle node → outputs come back
+   └──▶ quote_job / launch_job (fine-tunes) → hard budget cap, human approval above a threshold
 ```
+
+### Share a machine (one command, nothing to pre-install but uv)
+
+```bash
+uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --name iana
+```
+
+The owner's rules are enforced on their machine: jobs run only while it's idle (CPU/GPU under 60% busy, read from the GPU driver), each job is capped (30 min by default), one job runs at a time, and every job is printed in the owner's terminal with who sent it and what it installs. Ctrl-C stops sharing. See [SHARE.md](SHARE.md).
+
+### Run anything on the best idle GPU
+
+```bash
+gpuroute nodes add iana http://172.20.x.x:7400 <token>
+gpuroute map                                            # everything reachable + how busy it is
+gpuroute run examples/benchmark.py --dep torch          # → idle node → benchmark.json comes back
+gpuroute run examples/embed.py --dep sentence-transformers --file notes.md
+```
+
+Jobs are plain Python scripts that declare their own pip dependencies (`uv` installs them in a throwaway env on the target) and write results to `./out`.
 
 ## The problems it solves
 
@@ -50,6 +70,9 @@ Then ask: *"Fine-tune Qwen/Qwen2.5-0.5B-Instruct on mlabonne/guanaco-llama2-1k, 
 
 | Tool | What it does |
 |---|---|
+| `compute_map` | Every machine/provider the agent can use and how busy each is right now |
+| `run_workload` | Run any Python script (+ deps, + input files) on the best idle node or this machine |
+| `read_output` | Read a finished job's text outputs |
 | `estimate_job` | VRAM needed (weights/optimizer, activations, overhead) and estimated time on each GPU |
 | `quote_job` | Every way to run it, ranked by what you actually pay, plus the remaining allowance |
 | `launch_job` | Starts a LoRA fine-tune under a budget; refuses with a reason and cheaper options, or returns `pending_approval` |
@@ -118,7 +141,8 @@ gpuroute free-models
 
 ## Status / limitations
 
-- Launch adapters: **local** (Apple MPS / CUDA) and **Modal**. Vast, Kaggle and Colab are quoted with how-to steps; launch adapters are next.
+- Shared nodes: macOS and Linux; same-network (LAN/hotspot) connectivity with a bearer token. Jobs run as the owner's user, so share only with people you trust. Container sandboxing is next.
+- Launch adapters: **local** (Apple MPS / CUDA), **shared nodes**, and **Modal**. Vast, Kaggle and Colab are quoted with how-to steps; launch adapters are next.
 - Launch supports LoRA; estimate/quote also cover QLoRA and full fine-tuning.
 - Modal needs a payment method on the account before it runs GPUs (usage is still covered by the $30/month free credits); `connect_provider` detects this and walks the user through it.
 

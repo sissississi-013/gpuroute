@@ -324,7 +324,7 @@ def main():
     p.add_argument("--port", type=int, default=7400)
     p.add_argument("--name")
     p.add_argument("--max-minutes", type=int, default=30, help="cap per job")
-    p.add_argument("--idle-below", type=int, default=40, help="accept jobs only while CPU/GPU busy %% is below this")
+    p.add_argument("--idle-below", type=int, default=60, help="accept jobs only while CPU/GPU busy %% is below this")
     p.add_argument("--always", action="store_true", help="accept jobs even while the machine is busy")
     p.add_argument("--price", type=float, default=0.0, help="$/hour to charge (0 = free for your team)")
     p = sub.add_parser("nodes", help="list shared nodes, or add/rm one")
