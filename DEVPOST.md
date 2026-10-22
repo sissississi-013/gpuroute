@@ -26,6 +26,8 @@ gpuroute is an **MCP server + CLI + local dashboard**:
 - **gpuroute share**: one command turns any machine (a teammate's laptop, a gaming PC, a lab box) into a node. The owner's rules are enforced on their machine: idle-only (read from the GPU driver), a minutes cap, one job at a time, and every job printed in their terminal
 - **compute_map**: every resource the agent can use and how busy it is right now: this machine, shared nodes, Modal, the live Vast.ai spare-GPU market (1,650 GPUs listed today), Kaggle and Colab
 - **run_workload**: run ANY Python workload (transcription, embeddings, image generation, rendering, batch inference) with its own deps (installed by uv) and input files on the best idle node; outputs come back
+- **orbital_offers / book_orbital**: a marketplace for satellite compute (GPU time while the satellite is sunlit) and ground-station relay passes to downlink results, across operators, timed from live orbits
+- **run_workload(target="modal:H100")**: the agent picks the GPU (T4 → B200), and the budget becomes the provider's hard timeout
 - **read_output**: the agent reads results without extra file permissions
 - **estimate_job**: VRAM needed (weights/optimizer, activations, overhead) and time on 16 GPUs, before renting anything
 - **quote_job**: ranks every way to run the job by what you'd actually pay: your own Mac/GPU ($0, private), Kaggle, Colab, Modal (free credits), and the **live Vast.ai GPU market**
@@ -68,6 +70,8 @@ Agents get an allowance, never credentials. There is deliberately no MCP tool to
 - Modal needs a payment method before GPU use. connect_provider detects this in 3 seconds without spending anything
 
 ## Accomplishments
+- An agent chose a real **NVIDIA H100** on Modal for a benchmark: **767 TFLOPS for $0.0034**, under a $0.50 hard cap enforced as Modal's own timeout
+- **Orbital compute marketplace:** asked to "run this on satellite compute under $1," the agent browsed live offers, booked Starcloud-1's sunlit H100 window, got the real next downlink pass (AWS Ground Station Oregon, 63° elevation) and ran the job on an H100 under the satellite's timeline. Orbits, sunlight and passes are computed live with SGP4; operator listings and prices are mock, and the agent said so
 - A real agent, asked to "build a search index of my notes without hogging my laptop," checked the compute map, sent the job to a shared node and got 56 passages embedded on its GPU
 - A real agent (Claude Code) used it correctly on the first try: it quoted, picked the free local GPU, launched with a $1 cap and reported status
 - A real LoRA fine-tune on the M2 GPU: loss 2.75 → 2.23, $0.00, settled in the audit log
