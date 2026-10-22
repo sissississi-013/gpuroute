@@ -37,15 +37,19 @@
   section.tab.on { display: block; }
 
   #overview { position: relative; height: 100vh; min-height: 620px; padding: 0; overflow: hidden; background: #fff; }
-  .hero { position: absolute; left: 25.2%; width: 50.2%; top: 0; height: 86%; object-fit: cover; object-position: 50% 40%; }
-  .hero2 { position: absolute; left: 33.6%; width: 33.4%; top: 86%; height: 14%; object-fit: cover; object-position: 50% 45%; }
-  .hero2-label { position: absolute; left: calc(67% + 6px); top: calc(86% + 6px); font-size: 15px; font-weight: 500; }
+  .hero-box { position: absolute; left: 25.2%; width: 50.2%; top: 0; height: 86%; overflow: hidden; z-index: 2; }
+  .hero-box img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; display: block;
+                  filter: brightness(.72) contrast(1.08) saturate(.9); }
+  .wm-frame { position: absolute; inset: 0; }
+  .hero-box .wm-frame { inset: auto; left: -50.2%; top: 0; width: 199.2%; height: 116.28%; }
   .wordmark { position: absolute; left: -0.02em; top: 50%; transform: translateY(-50%);
               font-size: 21.4vw; font-weight: 500; letter-spacing: -0.058em; line-height: 1; white-space: nowrap;
-              color: #fff; mix-blend-mode: difference; pointer-events: none; }
+              color: #0d0d0c; pointer-events: none; }
+  .wordmark.glow { color: rgba(255,255,255,.34); text-shadow: 0 0 40px rgba(255,255,255,.28); }
+  .wordmark.light { color: #fff; mix-blend-mode: overlay; }
   .corner { position: absolute; font-size: 15px; }
   .blurb { left: 13px; bottom: 14px; width: 330px; color: #8a8a8a; line-height: 1.33; }
-  .credit { left: calc(67% + 6px); top: calc(86% + 30px); width: 220px; font-size: 10px; color: #b0b0b0; line-height: 1.3; }
+  .credit { left: calc(75.4% + 8px); top: calc(86% - 26px); width: 230px; font-size: 10px; color: #b0b0b0; line-height: 1.3; }
   .cta { right: 13px; bottom: 12px; font-size: 19px; font-weight: 500; color: #8a8a8a; text-decoration: none; }
   .cta:hover { color: var(--ink); }
   h2.big { font-size: clamp(56px, 9vw, 150px); font-weight: 500; letter-spacing: -0.055em; line-height: .9; margin: 24px 0 40px; }
@@ -90,24 +94,56 @@
 </head>
 <body>
 <nav class="bar">
-  <div>gpuroute&nbsp;&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
+  <div>gpuroute&nbsp;&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#start">Start</a>/<a href="#map">Map</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
   <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank" style="text-decoration:none">GitHub</a>, <a href="#compute" style="text-decoration:none">Share</a>, <a href="#spend" style="text-decoration:none">Spend</a><span class="dot" id="livedot"></span><span id="clock" style="display:none"></span></div>
 </nav>
 
 <section class="tab" id="overview">
-  <img class="hero" src="/static/hero.jpg" alt="Rows of server racks in the CERN computer centre">
-  <img class="hero2" src="/static/gpu.jpg" alt="Close-up of an NVIDIA GPU die">
-  <div class="wordmark">gpuroute©</div>
-  <div class="hero2-label" id="usable2">(02)</div>
-  <div class="corner credit">Photos: CERN Computer Centre, Simon Waldherr, CC BY-SA 4.0 · NVIDIA GPU, Binary Koala, CC BY-SA 2.0 (Wikimedia Commons)</div>
+  <div class="wm-frame"><div class="wordmark">gpuroute©</div></div>
+  <div class="hero-box">
+    <img src="/static/hero.jpg" alt="Rows of server racks in the CERN computer centre">
+    <div class="wm-frame"><div class="wordmark glow">gpuroute©</div></div>
+    <div class="wm-frame"><div class="wordmark light">gpuroute©</div></div>
+  </div>
+  <span id="usable2" hidden></span>
+  <div class="corner credit">Photo: CERN Computer Centre, Simon Waldherr, CC BY-SA 4.0, Wikimedia Commons</div>
   <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market.</div>
-  <a class="corner cta" href="#compute">(See Your Compute)</a>
+  <a class="corner cta" href="#start">(Get Started)</a>
+</section>
+
+<section class="tab" id="start">
+  <h2 class="big">Start<sup>(3 steps)</sup></h2>
+  <p class="lede">One command to connect your agents, one to share a spare machine, then just ask.</p>
+  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
+    <div class="idx">(01)</div><div><div class="name">Connect</div><div class="meta">Checks this machine and adds gpuroute to Claude Code and Codex, or prints the config for Cursor.</div></div>
+    <div class="cmd"><code id="c1">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute init</code><button onclick="copy('c1',this)">Copy</button></div>
+  </div>
+  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
+    <div class="idx">(02)</div><div><div class="name">Share</div><div class="meta">On any spare Mac or Linux GPU box. It only takes jobs while idle, and the owner sees each one. Paste the line it prints into <span class="mono">gpuroute join</span>.</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><div class="cmd"><code id="c2">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share</code><button onclick="copy('c2',this)">Copy</button></div>
+      <div class="cmd"><code>gpuroute join name@ip:7400#token</code><span class="meta">on your machine</span></div></div>
+  </div>
+  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
+    <div class="idx">(03)</div><div><div class="name">Ask</div><div class="meta">Your agent calls compute_map, run_workload, quote_job and launch_job itself.</div></div>
+    <div style="font-size:24px;letter-spacing:-.02em;line-height:1.35">“What compute can you use right now?”<br>“Embed my notes on a GPU. Don’t hog my laptop.”<br>“Fine-tune Qwen2.5-0.5B on my data for under $1.”</div>
+  </div>
+</section>
+
+<section class="tab" id="map">
+  <h2 class="big">Map<sup>(land/sea/orbit)</sup></h2>
+  <p class="lede">Where the world’s compute physically is, and how much of it your agent can actually use. Green is usable now. Everything else is the gap gpuroute closes, one machine at a time.</p>
+  <div style="position:relative">
+    <svg id="world" viewBox="0 0 1600 820" style="width:100%;height:auto;display:block" role="img" aria-label="World map of datacenters, undersea cables, underwater datacenters and orbital compute"></svg>
+    <div id="tip" style="position:absolute;pointer-events:none;display:none;background:#0d0d0c;color:#fff;font-size:13px;padding:8px 10px;border-radius:6px;max-width:300px"></div>
+  </div>
+  <div class="row" style="grid-template-columns:70px 1fr 1fr 1fr 1fr;margin-top:24px" id="maplegend"></div>
+  <p class="meta" style="font-size:12px;margin-top:12px">Sources: ATLAS Global Data Center Map (6,131 facilities with coordinates) · Epoch AI Frontier Data Centers (CC BY 4.0; geocoded with OpenStreetMap Nominatim) · TeleGeography Submarine Cable Map · CelesTrak orbital elements (positions computed live with SGP4) · underwater sites from public reporting, locations approximate.</p>
 </section>
 
 <section class="tab" id="compute">
   <h2 class="big">Compute<sup id="computecount"></sup></h2>
   <p class="lede">Everything your agents can reach, and how busy it is right now. Agents see the same list through <span class="mono">compute_map</span>.</p>
-  <div id="map"></div>
+  <div id="maplist"></div>
   <div class="two" style="margin-top:56px">
     <div>
       <p class="idx">(SHARE A MACHINE)</p>
@@ -154,6 +190,9 @@
   <div class="scroll"><table id="logt"></table></div>
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -164,6 +203,7 @@ let MAP = [], STATE = null;
 
 function route() {
   const t = (location.hash || "#overview").slice(1);
+  if (t === "map") drawWorld();
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === t));
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + t));
 }
@@ -181,10 +221,12 @@ function renderCounters() {
 }
 
 function renderMap() {
-  $("map").innerHTML = MAP.map((e, i) => {
+  $("maplist").innerHTML = MAP.map((e, i) => {
     const u = e.utilization || {};
     const state = e.available ? `<span class="pill go">usable</span>` : e.online === false ? `<span class="pill stop">offline</span>`
-      : (e.kind === "shared node" ? `<span class="pill wait">busy</span>` : `<span class="pill mutec">${e.kind === "cloud" ? "setup" : "manual"}</span>`);
+      : (e.kind === "shared node" ? `<span class="pill wait">busy</span>`
+      : ["frontier AI datacenters", "underwater", "orbital"].includes(e.kind) ? `<span class="pill mutec">not reachable</span>`
+      : `<span class="pill mutec">${e.kind === "cloud" ? "setup" : "manual"}</span>`);
     const meter = u.gpu_util_pct != null ? `<div class="mono">gpu ${u.gpu_util_pct}% · cpu ${u.cpu_load_pct ?? "?"}%</div><div class="meter"><i style="width:${u.gpu_util_pct}%"></i></div>` : "";
     return `<div class="row"><div class="idx">${pad(i + 1)}</div>
       <div><div class="name">${esc(e.name)}</div><div class="meta">${esc(e.kind)}</div></div>
@@ -248,6 +290,89 @@ function renderLog(log) {
     const d = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  ");
     return `<tr><td class="mono">${esc(ts.slice(5, 19).replace("T", " "))}</td><td>${esc(event.replaceAll("_", " "))}</td><td class="mono">${esc(d)}</td></tr>`;
   }).join("");
+}
+
+/* ---------- world map ---------- */
+let WORLD = null, orbitTimer = null;
+async function loadWorld() {
+  if (WORLD) return WORLD;
+  const j = (u) => fetch(u).then((r) => r.json());
+  const [land, atlas, cables, epoch, undersea, orbit] = await Promise.all([
+    j("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"), j("/static/geo/atlas.json"), j("/static/geo/cables.json"),
+    j("/static/geo/epoch.json").catch(() => []), j("/static/geo/undersea.json"), j("/static/geo/orbit.json")]);
+  WORLD = { land: topojson.feature(land, land.objects.land), atlas, cables, epoch, undersea, orbit };
+  return WORLD;
+}
+async function drawWorld() {
+  const W = await loadWorld();
+  const svg = d3.select("#world"); svg.selectAll("*").remove();
+  const proj = d3.geoEqualEarth().fitExtent([[10, 10], [1590, 810]], { type: "Sphere" });
+  const path = d3.geoPath(proj);
+  const tip = $("tip");
+  const show = (ev, html) => { tip.innerHTML = html; tip.style.display = "block";
+    const r = $("world").getBoundingClientRect(); tip.style.left = (ev.clientX - r.left + 14) + "px"; tip.style.top = (ev.clientY - r.top + 14) + "px"; };
+  const hide = () => tip.style.display = "none";
+  svg.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "#fff").attr("stroke", "#0d0d0c").attr("stroke-width", 1);
+  svg.append("path").attr("d", path(d3.geoGraticule10())).attr("fill", "none").attr("stroke", "#eceae4").attr("stroke-width", .6);
+  svg.append("path").attr("d", path(W.land)).attr("fill", "#ecebe6");
+  // undersea cables
+  svg.append("g").selectAll("path").data(W.cables).join("path")
+    .attr("d", (c) => path({ type: "MultiLineString", coordinates: c.g[0] && typeof c.g[0][0] === "number" ? [c.g] : c.g }))
+    .attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-opacity", .28).attr("stroke-width", .7);
+  // all facilities
+  svg.append("g").selectAll("circle").data(W.atlas).join("circle")
+    .attr("transform", (d) => `translate(${proj(d)})`).attr("r", 1.1).attr("fill", "#0d0d0c").attr("fill-opacity", .35);
+  // frontier AI datacenters sized by MW
+  const rs = d3.scaleSqrt().domain([0, d3.max(W.epoch, (d) => d.mw) || 1]).range([2, 22]);
+  svg.append("g").selectAll("circle").data(W.epoch).join("circle")
+    .attr("transform", (d) => `translate(${proj([d.lon, d.lat])})`).attr("r", (d) => rs(d.mw))
+    .attr("fill", "#0d0d0c").attr("fill-opacity", .12).attr("stroke", "#0d0d0c").attr("stroke-width", 1)
+    .on("mousemove", (ev, d) => show(ev, `<b>${d.name}</b><br>${d.owner || ""}<br>${Math.round(d.mw)} MW · ${Math.round(d.h100e).toLocaleString()} H100e`)).on("mouseleave", hide);
+  // underwater
+  const u = svg.append("g").selectAll("g").data(W.undersea).join("g").attr("transform", (d) => `translate(${proj([d.lon, d.lat])})`)
+    .on("mousemove", (ev, d) => show(ev, `<b>${d.name}</b><br>${d.status}<br>${d.what}<br><i>location approximate</i>`)).on("mouseleave", hide);
+  u.append("circle").attr("r", 9).attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-width", 2);
+  u.append("circle").attr("r", 3).attr("fill", "#3b6fd8");
+  u.append("text").text((d) => d.name.split(" (")[0].replace(" data center", "").replace(" underwater", "")).attr("x", 13).attr("y", 4)
+    .attr("font-size", 13).attr("font-family", "Inter, sans-serif").attr("fill", "#3b6fd8");
+  // orbit: live positions + ground tracks
+  const og = svg.append("g");
+  function drawOrbit() {
+    og.selectAll("*").remove();
+    const now = new Date();
+    W.orbit.forEach((o) => {
+      const rec = satellite.twoline2satrec(o.tle[1], o.tle[2]);
+      const pos = (t) => { const pv = satellite.propagate(rec, t); if (!pv.position) return null;
+        const g = satellite.eciToGeodetic(pv.position, satellite.gstime(t));
+        return [satellite.degreesLong(g.longitude), satellite.degreesLat(g.latitude), g.height]; };
+      const track = []; for (let m = -45; m <= 45; m += 1) { const p = pos(new Date(+now + m * 60000)); if (p) track.push(p.slice(0, 2)); }
+      og.append("path").attr("d", path({ type: "LineString", coordinates: track })).attr("fill", "none")
+        .attr("stroke", "#e8642c").attr("stroke-width", 1.5).attr("stroke-dasharray", "4 4");
+      const p = pos(now); if (!p) return;
+      const g = og.append("g").attr("transform", `translate(${proj(p.slice(0, 2))})`)
+        .on("mousemove", (ev) => show(ev, `<b>${o.name}</b> · ${Math.round(p[2])} km up<br>${o.what}<br><span style="opacity:.7">${o.source}, live</span>`)).on("mouseleave", hide);
+      g.append("circle").attr("r", 7).attr("fill", "#e8642c");
+      g.append("text").text(o.name).attr("x", 11).attr("y", 4).attr("font-size", 14).attr("font-weight", 500).attr("font-family", "Inter, sans-serif").attr("fill", "#e8642c");
+    });
+  }
+  // tier 1: where YOUR agent can run right now (this event: super{set}, San Francisco)
+  const mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
+  if (mine.length) {
+    const here = proj([-122.399, 37.786]);
+    const g = svg.append("g").attr("transform", `translate(${here})`)
+      .on("mousemove", (ev) => show(ev, `<b>Your agent can run here now</b><br>${mine.map((e) => `${e.name}: ${e.gpu}`).join("<br>")}`)).on("mouseleave", hide);
+    g.append("circle").attr("r", 16).attr("fill", "#2f7d5b").attr("fill-opacity", .18);
+    g.append("circle").attr("r", 6).attr("fill", "#2f7d5b");
+    g.append("text").text(`you: ${mine.map((e) => e.name).join(" + ")}`).attr("x", -14).attr("y", -20).attr("text-anchor", "end")
+      .attr("font-size", 15).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#2f7d5b");
+  }
+  drawOrbit(); clearInterval(orbitTimer); orbitTimer = setInterval(() => { if (location.hash === "#map") drawOrbit(); }, 3000);
+  const market = MAP.find((e) => e.kind === "spare-GPU market");
+  $("maplegend").innerHTML = `<div class="idx">(KEY)</div>
+    <div><b style="color:#2f7d5b">● Usable now</b><div class="meta">${mine.map((e) => e.name).join(", ") || "this machine"}: your agent runs jobs here via run_workload</div></div>
+    <div><b>● Rentable</b><div class="meta">${W.atlas.length.toLocaleString()} colocation datacenters (ATLAS) · ${market ? esc(String(market.gpu).split(" (")[0]) : "market GPUs"} on Vast · Modal. Quoted live by quote_job</div></div>
+    <div><b>○ Not reachable yet</b><div class="meta">${W.epoch.length} frontier AI sites sized by MW (Epoch AI) · <span style="color:#3b6fd8">◎ ${W.undersea.length} underwater DCs</span> over ${W.cables.length} undersea cables</div></div>
+    <div><b style="color:#e8642c">● In orbit, live</b><div class="meta">${W.orbit.map((o) => o.name).join(", ")}: real compute in space (CelesTrak + SGP4). Not rentable yet; agents see it in compute_map</div></div>`;
 }
 
 async function act(kind, id) { await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" }); refresh(); }

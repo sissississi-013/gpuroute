@@ -1,0 +1,26 @@
+[
+ {
+  "name": "Project Natick (Microsoft)",
+  "lon": -3.37,
+  "lat": 58.96,
+  "status": "retired 2020",
+  "what": "864 servers on the seabed off Orkney for 2 years; 1/8 the failure rate of land servers",
+  "approx": true
+ },
+ {
+  "name": "Hainan undersea data center (HiCloud)",
+  "lon": 109.6,
+  "lat": 18.2,
+  "status": "operating",
+  "what": "Commercial undersea data center modules off Sanya, Hainan",
+  "approx": true
+ },
+ {
+  "name": "Shanghai Lingang underwater data center",
+  "lon": 122.1,
+  "lat": 30.75,
+  "status": "announced/pilot 2025",
+  "what": "Offshore-wind powered underwater data center off Shanghai",
+  "approx": true
+ }
+]

@@ -268,6 +268,57 @@ def cmd_join(a):
     return cmd_nodes(a)
 
 
+GIT = "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute"
+
+
+def mcp_command():
+    """How an agent should launch the MCP server: this install if it's permanent, else via uvx."""
+    import shutil
+    from pathlib import Path
+    exe = Path(sys.prefix) / "bin" / "gpuroute-mcp"
+    if exe.exists() and ".cache/uv" not in str(exe) and "archive-v" not in str(exe):
+        return [str(exe)]
+    return [shutil.which("uvx") or "uvx", "--from", GIT, "gpuroute-mcp"]
+
+
+def cmd_init(a):
+    import shutil
+    import subprocess
+    from .catalog import local_device
+    con.print("\n[bold]gpuroute init[/]\n")
+    dev = local_device()
+    con.print(f"[green]✓[/] this machine: {dev['name'] if dev else 'no GPU (jobs go to shared nodes or the cloud)'}")
+    con.print(f"[green]✓[/] agent allowance: {money(ledger.wallet()['available_usd'])} this month "
+              f"(change with gpuroute policy)")
+    cmd = mcp_command()
+    agents = []
+    for name, add in (("claude", ["claude", "mcp", "add", "--scope", "user", "gpuroute", "--"]),
+                      ("codex", ["codex", "mcp", "add", "gpuroute", "--"])):
+        if not shutil.which(name):
+            continue
+        already = name == "claude" and "User config" in subprocess.run(
+            ["claude", "mcp", "get", "gpuroute"], capture_output=True, text=True).stdout
+        if already:
+            con.print(f"[green]✓[/] {name}: gpuroute already connected")
+            agents.append(name)
+            continue
+        ok = a.yes or con.input(f"  Connect gpuroute to {name}? [Y/n] ").strip().lower() in ("", "y", "yes")
+        if ok:
+            r = subprocess.run(add + cmd, capture_output=True, text=True)
+            if r.returncode == 0:
+                con.print(f"[green]✓[/] {name}: connected. Restart {name} to load the tools")
+                agents.append(name)
+            else:
+                con.print(f"[yellow]![/] {name}: {(r.stderr or r.stdout).strip()[:160]}")
+    con.print("\n[dim]Cursor or any other MCP client: add this server[/]")
+    con.print(json.dumps({"mcpServers": {"gpuroute": {"command": cmd[0], "args": cmd[1:]}}}))
+    con.print("\n[bold]Try asking your agent:[/]")
+    con.print("  “What compute can you use right now?”")
+    con.print("  “Embed my notes on a GPU, and don’t hog my laptop.”")
+    con.print("  “Fine-tune Qwen2.5-0.5B on my data for under $1.”")
+    con.print("\n[bold]Three commands:[/]  gpuroute run script.py · gpuroute share · gpuroute ui\n")
+
+
 def cmd_home(a):
     from . import pool
     entries = pool.compute_map()
@@ -280,7 +331,8 @@ def cmd_home(a):
     con.print("  [bold]gpuroute run[/] script.py      run anything on the best idle GPU (deps auto-detected)")
     con.print("  [bold]gpuroute share[/]              share this machine's idle GPU with your team")
     con.print("  [bold]gpuroute ui[/]                 open the dashboard")
-    con.print("  [dim]more: gpuroute --help · agents: claude mcp add gpuroute -- gpuroute-mcp[/]\n")
+    con.print("  [bold]gpuroute init[/]               connect gpuroute to Claude Code / Codex / Cursor")
+    con.print("  [dim]more: gpuroute --help[/]\n")
 
 
 def cmd_map(a):
@@ -333,6 +385,8 @@ def main():
     ap = argparse.ArgumentParser(prog="gpuroute", description="Size, price and launch GPU training jobs "
                                  "for AI agents, with a hard budget cap.")
     sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("init", help="set up: check this machine and connect gpuroute to your agents").add_argument(
+        "--yes", "-y", action="store_true")
     sub.add_parser("join", help="add a shared machine: gpuroute join name@ip:port#token").add_argument("code")
     job_args(sub.add_parser("estimate", help="VRAM + time per GPU"))
     job_args(sub.add_parser("quote", help="rank every way to run a job"))
@@ -389,7 +443,7 @@ def main():
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "init": cmd_init, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 

@@ -110,7 +110,33 @@ def compute_map():
                                 f"as of {updated}"})
     except Exception:
         pass
+    entries += world_compute_summary()
     for t in FREE_TIERS:
         entries.append({"kind": "free tier", "name": t["provider"], "gpu": f"{t['gpu']} x{t['count']}",
                         "cost": "$0", "available": False, "note": f"manual: {t['how']}"})
     return entries
+
+
+def world_compute_summary():
+    """Compute that exists but agents can't rent yet, from public data (shown on the Map tab)."""
+    from pathlib import Path
+    geo = Path(__file__).parent / "static" / "geo"
+    out = []
+    try:
+        epoch = json.loads((geo / "epoch.json").read_text())
+        top = sorted(epoch, key=lambda d: -d["mw"])[:3]
+        out.append({"kind": "frontier AI datacenters", "name": "epoch",
+                    "gpu": f"{len(epoch)} sites mapped, e.g. " + ", ".join(f"{d['name']} ({d['mw']:.0f} MW)" for d in top),
+                    "cost": "private", "available": False,
+                    "note": "not rentable by agents. Epoch AI Frontier Data Centers, CC BY 4.0"})
+        sea = json.loads((geo / "undersea.json").read_text())
+        out.append({"kind": "underwater", "name": "undersea",
+                    "gpu": ", ".join(f"{d['name']} ({d['status']})" for d in sea),
+                    "cost": "n/a", "available": False, "note": "not rentable; public reporting, locations approximate"})
+        orbit = json.loads((geo / "orbit.json").read_text())
+        out.append({"kind": "orbital", "name": "orbit",
+                    "gpu": "; ".join(f"{o['name']}: {o['what']}" for o in orbit),
+                    "cost": "n/a", "available": False, "note": "not rentable yet; live positions from CelesTrak"})
+    except Exception:
+        pass
+    return out

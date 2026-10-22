@@ -1,0 +1,22 @@
+[
+ {
+  "name": "Starcloud-1",
+  "tle": [
+   "STARCLOUD-1",
+   "1 66303U 25248L   26294.06153630  .00005432  00000+0  24288-3 0  9996",
+   "2 66303  45.4011 164.0124 0003507  16.3484 343.7516 15.22418978 53716"
+  ],
+  "what": "An NVIDIA H100 in low Earth orbit; trained and ran small language models in space (launched Nov 2025)",
+  "source": "CelesTrak NORAD 66303"
+ },
+ {
+  "name": "ISS",
+  "tle": [
+   "ISS (ZARYA)",
+   "1 25544U 98067A   26294.04791053  .00009575  00000+0  18188-3 0  9996",
+   "2 25544  51.6327  37.2623 0006759 289.5321  70.4938 15.48967427591263"
+  ],
+  "what": "HPE Spaceborne Computer-2, edge computing aboard the ISS",
+  "source": "CelesTrak NORAD 25544"
+ }
+]
