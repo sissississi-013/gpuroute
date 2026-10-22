@@ -5,14 +5,15 @@
 ```bash
 uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --name iana
 ```
-Copy the `gpuroute nodes add iana http://… <token>` line it prints.
+Copy the `gpuroute join iana@…` line it prints.
 
 **This Mac:**
 ```bash
 cd ~/national-renaissance-hackathon/gpuroute
-.venv/bin/gpuroute nodes add iana http://<iana-ip>:7400 <token>   # paste from Iana
+.venv/bin/gpuroute join "iana@<ip>:7400#<token>"                 # paste from Iana (keep the quotes)
 .venv/bin/gpuroute map                                            # iana should say usable: yes
-.venv/bin/gpuroute run examples/benchmark.py --dep torch --on iana   # warm-up: caches torch on Iana's machine
+.venv/bin/gpuroute run examples/benchmark.py --on iana              # warm-up: caches torch on Iana's machine
+.venv/bin/gpuroute nodes rm iana-sim                              # drop the simulated node
 .venv/bin/gpuroute ui                                             # dashboard tab
 cd .. && claude                                                   # Claude Code with gpuroute (.mcp.json here)
 ```

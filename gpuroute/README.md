@@ -27,10 +27,10 @@ The owner's rules are enforced on their machine: jobs run only while it's idle (
 ### Run anything on the best idle GPU
 
 ```bash
-gpuroute nodes add iana http://172.20.x.x:7400 <token>
+gpuroute join "iana@172.20.x.x:7400#<token>"   # the line `share` printed
 gpuroute map                                            # everything reachable + how busy it is
-gpuroute run examples/benchmark.py --dep torch          # → idle node → benchmark.json comes back
-gpuroute run examples/embed.py --dep sentence-transformers --file notes.md
+gpuroute run examples/benchmark.py                      # deps read from imports → idle node → results back
+gpuroute run examples/embed.py --file notes.md
 ```
 
 Jobs are plain Python scripts that declare their own pip dependencies (`uv` installs them in a throwaway env on the target) and write results to `./out`.
