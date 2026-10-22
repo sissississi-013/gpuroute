@@ -142,6 +142,9 @@
     <div id="tip" style="position:absolute;pointer-events:none;display:none;background:#0d0d0c;color:#fff;font-size:13px;padding:8px 10px;border-radius:6px;max-width:300px"></div>
   </div>
   <div class="row" style="grid-template-columns:70px 1fr 1fr 1fr 1fr;margin-top:24px" id="maplegend"></div>
+  <p class="idx" style="margin-top:56px">(ORBITAL MARKET: COMPUTE + RELAY, NEXT 6 HOURS)</p>
+  <p class="lede" style="margin:8px 0 16px">Agents buy GPU time aboard satellites while they’re sunlit, plus ground-station passes to downlink results: <span class="mono">orbital_offers</span> → <span class="mono">book_orbital</span>. Windows and passes come from the real orbits. Operator listings and prices are mock, and jobs are emulated on ground GPUs.</p>
+  <div class="scroll"><table id="orbitt"></table></div>
   <p class="meta" style="font-size:12px;margin-top:12px">Sources: ATLAS Global Data Center Map (6,131 facilities with coordinates) · Epoch AI Frontier Data Centers (CC BY 4.0; geocoded with OpenStreetMap Nominatim) · TeleGeography Submarine Cable Map · CelesTrak orbital elements (positions computed live with SGP4) · underwater sites from public reporting, locations approximate.</p>
 </section>
 
@@ -206,7 +209,7 @@ const mins = (m) => m < 120 ? Math.round(m) + " min" : (m / 60).toFixed(1) + " h
 const pad = (i) => "(" + String(i).padStart(2, "0") + ")";
 let MAP = [], STATE = null;
 const STATIC = !["127.0.0.1", "localhost"].includes(location.hostname);
-const SNAP = { "/api/state": "snapshot/state.json", "/api/map": "snapshot/map.json" };
+const SNAP = { "/api/state": "snapshot/state.json", "/api/map": "snapshot/map.json", "/api/orbit": "snapshot/orbit.json" };
 async function api(path) {
   if (STATIC) {
     const key = path.split("?")[0];
@@ -218,7 +221,7 @@ if (STATIC) document.documentElement.classList.add("static");
 
 function route() {
   const t = (location.hash || "#overview").slice(1);
-  if (t === "map") drawWorld();
+  if (t === "map") { drawWorld(); renderOrbit(); }
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === t));
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + t));
 }
@@ -388,6 +391,19 @@ async function drawWorld() {
     <div><b>● Rentable</b><div class="meta">${W.atlas.length.toLocaleString()} colocation datacenters (ATLAS) · ${market ? esc(String(market.gpu).split(" (")[0]) : "market GPUs"} on Vast · Modal. Quoted live by quote_job</div></div>
     <div><b>○ Not reachable yet</b><div class="meta">${W.epoch.length} frontier AI sites sized by MW (Epoch AI) · <span style="color:#3b6fd8">◎ ${W.undersea.length} underwater DCs</span> over ${W.cables.length} undersea cables</div></div>
     <div><b style="color:#e8642c">● In orbit, live</b><div class="meta">${W.orbit.map((o) => o.name).join(", ")}: real compute in space (CelesTrak + SGP4). Not rentable yet; agents see it in compute_map</div></div>`;
+}
+
+async function renderOrbit() {
+  try {
+    const o = await api("/api/orbit");
+    $("orbitt").innerHTML = `<tr><th>offer</th><th>satellite</th><th>type</th><th>operator</th><th>window</th><th>what you get</th><th>price</th></tr>` +
+      o.offers.filter((x) => x.type !== "position").map((x) => `<tr>
+        <td class="mono">${esc(x.offer_id)}</td><td>${esc(x.satellite)}</td>
+        <td>${x.type === "compute" ? `<span class="pill" style="color:#e8642c">compute</span>` : `<span class="pill" style="color:#3b6fd8">relay</span>`}</td>
+        <td class="meta">${esc(x.operator)}</td><td class="mono">${esc(x.window)}</td>
+        <td>${x.type === "compute" ? `${esc(x.hardware)}, ${x.minutes} min, ${esc(x.power)}<div class="meta">downlink: ${esc(x.next_downlink)}</div>` : `${x.capacity_gb} GB down · ${x.max_elevation_deg}° max elevation`}</td>
+        <td class="mono">${x.type === "compute" ? "$" + x.usd_per_gpu_min + "/GPU-min" : "$" + x.usd_per_gb + "/GB"}</td></tr>`).join("");
+  } catch (e) {}
 }
 
 async function act(kind, id) { await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" }); refresh(); }

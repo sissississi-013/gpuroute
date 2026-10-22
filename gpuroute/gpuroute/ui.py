@@ -57,6 +57,9 @@ class Handler(BaseHTTPRequestHandler):
                             budget_usd=float(q["budget"]) if q.get("budget") else None,
                             params_b=float(q["params_b"]) if q.get("params_b") else None)
                 return self.send(res)
+            if u.path == "/api/orbit":
+                from . import orbital
+                return self.send(orbital.offers(6))
             if u.path == "/api/map":
                 from . import pool
                 return self.send(pool.compute_map())

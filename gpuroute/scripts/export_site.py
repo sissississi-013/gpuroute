@@ -26,5 +26,7 @@ state["log"] = [e for e in state["log"] if e["event"] not in ("node_added", "nod
 (out / "snapshot" / "map.json").write_text(json.dumps(scrub(pool.compute_map())))
 (out / "snapshot" / "quote.json").write_text(json.dumps(quote("Qwen/Qwen2.5-1.5B-Instruct", "lora", 2000, 512, 1,
                                                               budget_usd=1.0)))
+from gpuroute import orbital
+(out / "snapshot" / "orbit.json").write_text(json.dumps(orbital.offers(6)))
 (out / "vercel.json").write_text(json.dumps({"cleanUrls": True}))
 print("exported to", out)
