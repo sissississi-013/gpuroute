@@ -47,6 +47,16 @@ def launch(model_id, dataset, budget_usd=0.0, method="lora", examples=1000, seq_
         launchable = [o for o in launchable if o["est_minutes"] <= max_minutes] or launchable
     opt = launchable[0] if launchable else None  # already ranked cheapest-first
 
+    if opt is None and provider in ("modal", "auto"):
+        from .providers import known
+        m = known("modal")
+        if m.get("ready") is False:
+            fits = any(o["provider"] == "modal" for o in q["options"])
+            if provider == "modal" or fits:
+                return _refuse(model_id, budget_usd, requested_by,
+                               f"Modal isn't set up yet (blocked on {m.get('blocked_on')}). Call "
+                               f"connect_provider('modal'): it opens the one page the user needs, then "
+                               f"verifies. Or use provider='local' if this machine fits the job.", q)
     if opt is None:
         return _refuse(model_id, budget_usd, requested_by,
                        f"no launchable option fits this job (needs ~{q['estimate']['vram_needed_gb']} GB VRAM"
@@ -55,7 +65,7 @@ def launch(model_id, dataset, budget_usd=0.0, method="lora", examples=1000, seq_
     if budget_usd > cfg["max_job_usd"]:
         return _refuse(model_id, budget_usd, requested_by,
                        f"budget ${budget_usd} exceeds the per-job cap of ${cfg['max_job_usd']}", q)
-    if budget_usd > wal["available_usd"]:
+    if opt["provider"] != "local" and budget_usd > wal["available_usd"]:
         return _refuse(model_id, budget_usd, requested_by,
                        f"budget ${budget_usd} exceeds the remaining allowance of ${wal['available_usd']}", q)
     if opt["cost_usd"] > budget_usd:
@@ -80,7 +90,7 @@ def launch(model_id, dataset, budget_usd=0.0, method="lora", examples=1000, seq_
         job.update(price_per_s=0.0,
                    hard_timeout_s=int((max_minutes or max(10, opt["est_minutes"] * 2)) * 60))
 
-    if budget_usd > cfg["approval_threshold_usd"]:
+    if job["price_per_s"] > 0 and budget_usd > cfg["approval_threshold_usd"]:
         job["state"] = "pending_approval"
         ledger.save_job(job)
         ledger.record("approval_requested", job=job_id, budget_usd=budget_usd, provider=job["provider"],
