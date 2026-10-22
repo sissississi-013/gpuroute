@@ -90,7 +90,7 @@ def run_workload(script: str, deps: list[str] = [], args: list[str] = [], files:
 
     script: absolute path to a .py file, or inline Python. It should write results into ./out
             (also $GPUROUTE_OUT); they are copied back here when the job ends.
-    deps: pip packages the script needs (installed in a throwaway env on the target), e.g. ["torch"].
+    deps: pip packages the script needs. Leave empty to infer them from the script's imports.
     files: absolute paths of local input files to send along (≤50 MB total); they sit next to the script.
     target: "auto", "local", or a node name from compute_map.
     """

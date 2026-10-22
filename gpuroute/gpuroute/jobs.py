@@ -343,6 +343,9 @@ def run_workload(script, deps=(), args=(), files=(), title=None, needs_gpu=True,
     from .node import hardware
 
     code = Path(script).read_text() if script.endswith(".py") and Path(script).exists() else script
+    if not deps:
+        from .deps import infer
+        deps = infer(code)
     title = title or (Path(script).name if script.endswith(".py") else "inline script")
     files = [str(Path(f).expanduser().resolve()) for f in files]
     missing = [f for f in files if not Path(f).exists()]

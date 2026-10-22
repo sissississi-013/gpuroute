@@ -4,265 +4,322 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gpuroute</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f5f1; --panel: #ffffff; --ink: #1b1b18; --muted: #6d6b63; --line: #e3e1d9;
-    --accent: #1f5f4a; --accent-soft: #e2efe9; --warn: #a3520f; --warn-soft: #f8ecdf;
-    --bad: #a12a2a; --bad-soft: #f6e3e3; --run: #8a6d00; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --paper: #f3f2ee; --ink: #0d0d0c; --mute: #8a8880; --line: #d9d7cf; --card: #fbfaf7;
+    --go: #2f7d5b; --wait: #c96a1f; --stop: #b33a3a;
+    --sans: "Inter Tight", "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #121311; --panel: #1b1c1a; --ink: #ecebe6; --muted: #9a988f; --line: #2c2d2a;
-      --accent: #6cc4a1; --accent-soft: #1d3029; --warn: #e3a35f; --warn-soft: #33281c;
-      --bad: #e58b8b; --bad-soft: #3a2222; --run: #e0c35a;
-    }
+    :root { --paper: #0f0f0e; --ink: #f1f0ea; --mute: #8f8d85; --line: #2a2a27; --card: #171716; --go: #6cc4a1; --wait: #e3a35f; --stop: #e58b8b; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  h1 { font: 600 20px/1 var(--mono); letter-spacing: -0.02em; margin: 0; }
-  h1 span { color: var(--muted); font-weight: 400; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  .stat .k { color: var(--muted); font-size: 12px; }
-  .stat .v { font: 600 22px/1.2 var(--mono); }
-  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 14px; display: flex; }
-  .bar i { display: block; height: 100%; }
-  .muted { color: var(--muted); }
-  .mono { font-family: var(--mono); }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
+  body { font-size: 15px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  button { font: 500 14px var(--sans); color: var(--ink); background: none; border: 1px solid var(--ink);
+           border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+  button.solid { background: var(--ink); color: var(--paper); }
+  button:disabled { opacity: .4; cursor: default; }
+
+  .bar { position: fixed; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: baseline;
+         padding: 18px 24px; z-index: 10; font-size: 17px; font-weight: 500; }
+  .bar .tabs a { text-decoration: none; padding-bottom: 2px; }
+  .bar .tabs a.on { border-bottom: 1.5px solid var(--ink); }
+  .bar .right { display: flex; align-items: center; white-space: pre; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); display: inline-block; margin-left: 6px; }
+  .dot.live { background: var(--go); }
+
+  section.tab { display: none; min-height: 100vh; padding: 88px 24px 48px; }
+  section.tab.on { display: block; }
+
+  #overview { position: relative; height: 100vh; min-height: 640px; padding: 0; overflow: hidden; }
+  #field { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: min(50vw, 820px); height: 86vh; }
+  .wordmark { position: absolute; left: -0.03em; right: 0; top: 50%; transform: translateY(-58%);
+              font-size: 21vw; font-weight: 500; letter-spacing: -0.065em; line-height: .8; white-space: nowrap;
+              color: #fff; mix-blend-mode: difference; pointer-events: none; }
+  .corner { position: absolute; font-size: 15px; }
+  .blurb { left: 24px; bottom: 24px; width: 360px; color: var(--mute); }
+  .cta { right: 24px; bottom: 24px; font-size: 20px; font-weight: 500; color: var(--mute); text-decoration: none; }
+  .cta:hover { color: var(--ink); }
+  .counters { left: 24px; top: 88px; font-family: var(--mono); font-size: 13px; line-height: 1.9; }
+  .counters b { font-weight: 500; }
+  .legend { right: 24px; top: 88px; font-family: var(--mono); font-size: 13px; line-height: 1.9; text-align: right; color: var(--mute); }
+
+  h2.big { font-size: clamp(56px, 9vw, 150px); font-weight: 500; letter-spacing: -0.055em; line-height: .9; margin: 24px 0 40px; }
+  h2.big sup { font-size: .22em; letter-spacing: 0; vertical-align: top; font-family: var(--mono); font-weight: 400; color: var(--mute); }
+  .lede { max-width: 640px; color: var(--mute); font-size: 18px; margin: -16px 0 40px; }
+  .row { display: grid; grid-template-columns: 70px 1.4fr 1.3fr 1fr 150px; gap: 20px; align-items: baseline;
+         padding: 22px 0; border-top: 1px solid var(--line); }
+  .row:last-child { border-bottom: 1px solid var(--line); }
+  .idx { font-family: var(--mono); font-size: 13px; color: var(--mute); }
+  .name { font-size: clamp(28px, 3.4vw, 52px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
+  .meta { color: var(--mute); font-size: 14px; }
+  .mono { font-family: var(--mono); font-size: 13px; }
+  .pill { display: inline-block; font: 500 12px var(--mono); padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; }
+  .go { color: var(--go); } .wait { color: var(--wait); } .stop { color: var(--stop); } .mutec { color: var(--mute); }
+  .meter { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px; width: 160px; }
+  .meter i { display: block; height: 100%; background: var(--ink); }
+  .cmd { font-family: var(--mono); font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+         padding: 14px 16px; display: flex; justify-content: space-between; gap: 16px; align-items: center; overflow-x: auto; }
+  .cmd code { white-space: nowrap; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .figure { font-size: clamp(44px, 6vw, 96px); font-weight: 500; letter-spacing: -0.05em; line-height: 1; }
+  .figs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; border-top: 1px solid var(--ink); padding-top: 16px; }
+  .approval { border: 1.5px solid var(--wait); border-radius: 14px; padding: 20px; display: flex; justify-content: space-between;
+              gap: 20px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  form.q { display: grid; grid-template-columns: 2fr repeat(4, 1fr) auto; gap: 10px; align-items: end; }
+  label { font-size: 12px; color: var(--mute); display: flex; flex-direction: column; gap: 6px; }
+  input, select { font: 14px var(--mono); padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+                  background: var(--card); color: var(--ink); width: 100%; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { font-size: 12px; color: var(--muted); font-weight: 500; }
-  tr.rec td { background: var(--accent-soft); }
-  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font: 500 12px/1.6 var(--mono); }
-  .s-running { background: var(--warn-soft); color: var(--run); }
-  .s-completed { background: var(--accent-soft); color: var(--accent); }
-  .s-failed, .s-denied { background: var(--bad-soft); color: var(--bad); }
-  .s-stopped_at_budget { background: var(--warn-soft); color: var(--warn); }
-  .s-pending_approval { background: var(--warn-soft); color: var(--warn); }
-  .s-cancelled { background: var(--line); color: var(--muted); }
-  .job { display: grid; grid-template-columns: 1fr 220px; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-  .job:last-child { border-bottom: 0; }
-  .job .meta { color: var(--muted); font-size: 13px; }
-  .prog { height: 6px; background: var(--line); border-radius: 3px; margin: 8px 0 4px; overflow: hidden; }
-  .prog i { display: block; height: 100%; background: var(--accent); }
-  .approval { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; padding: 14px 16px;
-              display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
-  button { font: 500 13px/1 inherit; padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
-           background: var(--panel); color: var(--ink); cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
-  button.danger { color: var(--bad); }
-  form { display: grid; grid-template-columns: 2fr repeat(5, 1fr) auto; gap: 8px; align-items: end; }
-  label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
-  input, select { font: 13px var(--mono); padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px;
-                  background: var(--bg); color: var(--ink); width: 100%; }
-  .err { color: var(--bad); font-size: 13px; margin-top: 6px; }
-  .log td { font: 12px var(--mono); }
+  td, th { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 500; color: var(--mute); font-size: 13px; }
+  td.mono { font-size: 12px; }
   .scroll { overflow-x: auto; }
-  svg.spark { width: 220px; height: 54px; }
-  @media (max-width: 760px) {
-    form { grid-template-columns: 1fr 1fr; }
-    .job { grid-template-columns: 1fr; }
+  svg.spark { width: 150px; height: 40px; }
+  .empty { color: var(--mute); padding: 32px 0; border-top: 1px solid var(--line); font-size: 18px; }
+  @media (max-width: 820px) {
+    .row { grid-template-columns: 40px 1fr; } .row > :nth-child(n+3) { grid-column: 2; }
+    .two, .figs { grid-template-columns: 1fr 1fr; } form.q { grid-template-columns: 1fr 1fr; }
+    #field { width: 72vw; } .legend { display: none; } .bar { font-size: 14px; flex-wrap: wrap; gap: 6px; }
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>gpuroute <span>/ compute for your agents</span></h1>
-    <span class="muted" id="updated"></span>
-  </header>
+<nav class="bar">
+  <div><b>gpuroute</b>&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
+  <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank">GitHub</a>, <a href="#compute">Share</a>, <span id="clock" class="mutec"></span><span class="dot" id="livedot"></span></div>
+</nav>
 
-  <h2>Allowance</h2>
-  <div class="panel">
-    <div class="grid" id="wallet"></div>
-    <div class="bar" id="walletbar"></div>
+<section class="tab" id="overview">
+  <canvas id="field" role="img" aria-label="Every GPU your agents can reach: large tiles are your machines, small dots are spare GPUs on the market"></canvas>
+  <div class="wordmark">gpuroute©</div>
+  <div class="corner counters" id="counters"></div>
+  <div class="corner legend">■ your machines<br>· spare market GPUs<br>tile fill = how busy</div>
+  <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market, and runs any workload there under the owner’s rules and a hard budget.</div>
+  <a class="corner cta" href="#compute">(See your compute)</a>
+</section>
+
+<section class="tab" id="compute">
+  <h2 class="big">Compute<sup id="computecount"></sup></h2>
+  <p class="lede">Everything your agents can reach, and how busy it is right now. Agents see the same list through <span class="mono">compute_map</span>.</p>
+  <div id="map"></div>
+  <div class="two" style="margin-top:56px">
+    <div>
+      <p class="idx">(SHARE A MACHINE)</p>
+      <p style="font-size:22px;letter-spacing:-.02em;max-width:520px">Run this on any Mac or Linux box with a GPU. Jobs only start while it’s idle, each is capped at 30 minutes, and the owner sees every job.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="cmd"><code id="sharecmd">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share</code><button onclick="copy('sharecmd', this)">Copy</button></div>
+      <div class="cmd"><code>gpuroute join name@ip:7400#token</code><span class="meta">paste what it prints</span></div>
+    </div>
   </div>
+</section>
 
-  <h2>Compute you can reach</h2>
-  <div class="panel scroll"><table id="map"></table></div>
+<section class="tab" id="jobs">
+  <h2 class="big">Jobs<sup id="jobcount"></sup></h2>
+  <p class="lede">Anything your agents ran: training, embeddings, transcription, benchmarks. Outputs come back to this machine.</p>
+  <div class="cmd" style="max-width:640px;margin-bottom:40px"><code>gpuroute run my_script.py</code><span class="meta">deps are read from its imports</span></div>
+  <div id="jobsl"></div>
+</section>
 
-  <h2>Provider setup</h2>
-  <div class="panel" id="providers"></div>
+<section class="tab" id="spend">
+  <h2 class="big">Spend</h2>
+  <p class="lede">Agents hold an allowance, never your credentials. Paid jobs above the threshold wait for you, and the budget becomes the provider’s hard timeout.</p>
+  <div class="figs" id="wallet"></div>
+  <div id="approvals" style="margin-top:48px"></div>
+  <p class="idx" style="margin-top:48px">(PROVIDERS)</p>
+  <div id="providers"></div>
+  <p class="idx" style="margin-top:56px">(PRICE A FINE-TUNE)</p>
+  <form class="q" id="qform">
+    <label>model<input name="model" value="Qwen/Qwen2.5-1.5B-Instruct"></label>
+    <label>method<select name="method"><option>lora</option><option>qlora</option><option>full</option></select></label>
+    <label>rows<input name="examples" value="2000" type="number"></label>
+    <label>seq len<input name="seq_len" value="512" type="number"></label>
+    <label>budget $<input name="budget" value="1" step="0.1" type="number"></label>
+    <button class="solid">Quote</button>
+  </form>
+  <p id="qsummary" class="meta" style="margin-top:16px"></p>
+  <div class="scroll"><table id="qtable"></table></div>
+  <p id="qnotes" class="meta" style="font-size:12px"></p>
+</section>
 
-  <div id="approvals"></div>
-
-  <h2>Jobs</h2>
-  <div class="panel" id="jobs"><span class="muted">No jobs yet.</span></div>
-
-  <h2>Quote a job</h2>
-  <div class="panel">
-    <form id="qform">
-      <label>model<input name="model" value="Qwen/Qwen2.5-0.5B-Instruct"></label>
-      <label>method<select name="method"><option>lora</option><option>qlora</option><option>full</option></select></label>
-      <label>rows<input name="examples" value="2000" type="number"></label>
-      <label>seq len<input name="seq_len" value="512" type="number"></label>
-      <label>epochs<input name="epochs" value="1" type="number"></label>
-      <label>budget $<input name="budget" value="1" step="0.1" type="number"></label>
-      <button class="primary">Quote</button>
-    </form>
-    <div id="qerr" class="err"></div>
-    <div id="qsummary" class="muted" style="margin-top:12px"></div>
-    <div class="scroll"><table id="qtable"></table></div>
-    <div id="qnotes" class="muted" style="font-size:12px;margin-top:8px"></div>
-  </div>
-
-  <h2>Audit log</h2>
-  <div class="panel scroll"><table class="log" id="log"></table></div>
-</div>
+<section class="tab" id="log">
+  <h2 class="big">Log</h2>
+  <p class="lede">Append-only record of every launch, refusal, approval and settlement.</p>
+  <div class="scroll"><table id="logt"></table></div>
+</section>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = (x) => !x ? "$0" : x < 0.01 ? "$" + x.toFixed(4) : "$" + x.toFixed(2);
 const mins = (m) => m < 120 ? Math.round(m) + " min" : (m / 60).toFixed(1) + " h";
+const pad = (i) => "(" + String(i).padStart(2, "0") + ")";
+let MAP = [], STATE = null;
+
+function route() {
+  const t = (location.hash || "#overview").slice(1);
+  document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === t));
+  document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + t));
+  if (t === "overview") drawField();
+}
+addEventListener("hashchange", route);
+function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy", 1200); }
+
+/* the field: every reachable GPU as a mark */
+const PALETTE = ["#e8784a", "#9fd8b8", "#6f63d9"];
+function drawField() {
+  const c = $("field"); if (!c || !c.offsetWidth) return;
+  const dpr = devicePixelRatio || 1, W = c.offsetWidth, H = c.offsetHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  g.fillStyle = "#121211"; g.fillRect(0, 0, W, H);
+  const mine = MAP.filter((e) => e.kind === "this machine" || e.kind === "shared node");
+  const market = MAP.find((e) => e.kind === "spare-GPU market");
+  const marketN = market ? parseInt(String(market.gpu)) || 0 : 0;
+  const cols = 44, cell = W / cols, rows = Math.ceil(H / cell);
+  let n = 0;
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+    const lit = n++ < marketN;
+    g.fillStyle = lit ? PALETTE[(r * 7 + k * 3) % 3] : "#20201e";
+    g.globalAlpha = lit ? 0.3 + 0.55 * ((r * 13 + k * 7) % 10) / 10 : 1;
+    g.beginPath(); g.arc(k * cell + cell / 2, r * cell + cell / 2, cell * 0.27, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
+  const tile = Math.min((W - 32) / Math.max(mine.length, 2) - 16, H * 0.3);
+  mine.forEach((e, i) => {
+    const x = W / 2 - (mine.length * (tile + 16) - 16) / 2 + i * (tile + 16), y = H * 0.1;
+    const busy = Math.min(1, Math.max(0, (e.utilization?.gpu_util_pct ?? 0) / 100));
+    g.fillStyle = e.available ? PALETTE[1] : e.online === false ? "#444" : PALETTE[0];
+    g.fillRect(x, y, tile, tile);
+    g.fillStyle = "rgba(18,18,17,.82)"; g.fillRect(x, y + tile * (1 - busy), tile, tile * busy);
+    g.fillStyle = "#121211"; g.font = "500 15px 'JetBrains Mono', monospace";
+    g.fillText(e.name, x + 12, y + 24);
+    g.font = "13px 'JetBrains Mono', monospace";
+    g.fillText(e.available ? "idle · usable" : e.online === false ? "offline" : "busy", x + 12, y + 44);
+  });
+}
+addEventListener("resize", drawField);
+
+function renderCounters() {
+  const usable = MAP.filter((e) => e.available).length;
+  const shared = MAP.filter((e) => e.kind === "shared node").length;
+  const market = MAP.find((e) => e.kind === "spare-GPU market");
+  const w = STATE?.wallet;
+  $("counters").innerHTML = `(01) <b>${usable}</b> usable now<br>(02) <b>${shared}</b> shared machine${shared === 1 ? "" : "s"}<br>` +
+    `(03) <b>${market ? (parseInt(String(market.gpu)) || 0).toLocaleString() : "?"}</b> spare market GPUs<br>(04) <b>${w ? money(w.spent_usd) : "$0"}</b> spent this month`;
+  $("livedot").classList.toggle("live", usable > 0);
+  $("computecount").textContent = `(${MAP.length})`;
+}
+
+function renderMap() {
+  $("map").innerHTML = MAP.map((e, i) => {
+    const u = e.utilization || {};
+    const state = e.available ? `<span class="pill go">usable</span>` : e.online === false ? `<span class="pill stop">offline</span>`
+      : (e.kind === "shared node" ? `<span class="pill wait">busy</span>` : `<span class="pill mutec">${e.kind === "cloud" ? "setup" : "manual"}</span>`);
+    const meter = u.gpu_util_pct != null ? `<div class="mono">gpu ${u.gpu_util_pct}% · cpu ${u.cpu_load_pct ?? "?"}%</div><div class="meter"><i style="width:${u.gpu_util_pct}%"></i></div>` : "";
+    return `<div class="row"><div class="idx">${pad(i + 1)}</div>
+      <div><div class="name">${esc(e.name)}</div><div class="meta">${esc(e.kind)}</div></div>
+      <div><div>${esc(e.gpu || "")}</div><div class="meta">${esc(e.note || "")}</div></div>
+      <div>${meter}<div class="mono" style="margin-top:6px">${esc(e.cost)}</div></div>
+      <div style="text-align:right">${state}</div></div>`;
+  }).join("");
+}
 
 function spark(vals) {
   if (!vals || vals.length < 2) return "";
-  const w = 220, h = 54, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * (w - 8) + 4},${h - 6 - ((v - lo) / span) * (h - 16)}`);
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${pts.join(" ")}"/>
-    <text x="4" y="10" font-size="10" fill="var(--muted)" font-family="ui-monospace,monospace">loss ${vals[0]} → ${vals[vals.length-1]}</text></svg>`;
+  const w = 150, h = 40, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * (w - 4) + 2},${h - 4 - ((v - lo) / span) * (h - 8)}`);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-label="loss curve"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="${pts.join(" ")}"/></svg>`;
 }
-
-async function act(kind, id) {
-  const r = await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" });
-  const j = await r.json();
-  if (j.ok === false) alertBox(j.error);
-  refresh();
-}
-function alertBox(msg) { $("approvals").insertAdjacentHTML("afterbegin", `<div class="err">${esc(msg)}</div>`); }
-
-function renderWallet(w) {
-  const used = w.spent_usd + w.reserved_usd;
-  $("wallet").innerHTML = [
-    ["available", money(w.available_usd)], ["spent", money(w.spent_usd)],
-    ["reserved by running jobs", money(w.reserved_usd)], ["monthly cap", money(w.allowance_usd)],
-    ["approval above", money(w.approval_threshold_usd)], ["per-job cap", money(w.max_job_usd)],
-  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
-  const pct = (x) => Math.min(100, (x / w.allowance_usd) * 100);
-  $("walletbar").innerHTML = `<i style="width:${pct(w.spent_usd)}%;background:var(--accent)"></i>` +
-    `<i style="width:${pct(w.reserved_usd)}%;background:var(--warn)"></i>`;
-}
+const STATE_CLASS = { running: "wait", completed: "go", failed: "stop", denied: "stop", stopped_at_budget: "wait", pending_approval: "wait", cancelled: "mutec" };
 
 function renderJobs(jobs) {
-  const pending = jobs.filter((j) => j.state === "pending_approval");
-  $("approvals").innerHTML = pending.length ? `<h2>Needs your approval</h2>` + pending.map((j) => `
-    <div class="approval"><div><b>${esc(j.requested_by)}</b> wants to spend up to <b>${money(j.budget_usd)}</b>
-      on ${esc(j.provider)} ${esc(j.gpu)} to fine-tune <span class="mono">${esc(j.model)}</span>
-      <div class="muted">est. ${money(j.est_cost_usd)} · ${mins(j.est_minutes)} · data leaving device: ${esc(j.data_leaving_device)}</div></div>
-      <div><button class="primary" onclick="act('approve','${j.id}')">Approve</button>
-      <button class="danger" onclick="act('deny','${j.id}')">Deny</button></div></div>`).join("") : "";
   const rest = jobs.filter((j) => j.state !== "pending_approval");
-  if (!rest.length) { $("jobs").innerHTML = `<span class="muted">No jobs yet. Ask your agent to fine-tune something.</span>`; return; }
-  $("jobs").innerHTML = rest.map((j) => {
+  $("jobcount").textContent = `(${rest.length})`;
+  if (!rest.length) { $("jobsl").innerHTML = `<div class="empty">No jobs yet. Ask your agent to run something on a GPU.</div>`; return; }
+  $("jobsl").innerHTML = rest.map((j, i) => {
     const p = j.progress, spent = j.actual_cost_usd ?? j.cost_so_far_usd ?? 0;
-    return `<div class="job"><div>
-      <div><span class="pill s-${j.state}">${j.state.replaceAll("_", " ")}</span>
-        <span class="mono" style="margin-left:8px">${esc(j.model)}</span> ${j.phase ? `<span class="muted">· ${esc(j.phase)}</span>` : ""}</div>
-      <div class="meta">${esc(j.id)} · ${esc(j.provider)} · ${esc(j.gpu_name || j.gpu)} · by ${esc(j.requested_by)}</div>
-      ${p ? `<div class="prog"><i style="width:${(100 * p.step / p.steps).toFixed(0)}%"></i></div>
-        <div class="meta mono">step ${p.step}/${p.steps} · loss ${p.loss} · ${p.tok_per_s} tok/s</div>` : ""}
-      <div class="meta mono">spent ${money(spent)} of ${money(j.budget_usd)} budget · GPU ${Math.round(j.gpu_seconds || 0)}s / cap ${j.hard_timeout_s}s</div>
-      <div class="meta">data leaving device: ${esc(j.data_leaving_device)}</div>
-      ${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}
-      ${j.outputs && j.outputs.length ? `<div class="meta mono">outputs: ${j.outputs.map(esc).join(", ")} → ${esc(j.artifact)}</div>`
-        : j.state === "completed" && j.artifact ? `<div class="meta mono">adapter → ${esc(j.artifact)}</div>` : ""}
-      ${j.state === "running" ? `<div style="margin-top:8px"><button class="danger" onclick="act('cancel','${j.id}')">Stop job</button></div>` : ""}
-    </div><div>${spark(j.loss_curve)}</div></div>`;
+    const prog = p && p.steps ? `<div class="meter" style="width:100%"><i style="width:${(100 * p.step / p.steps).toFixed(0)}%"></i></div><div class="mono">step ${p.step}/${p.steps} · loss ${p.loss}</div>` : "";
+    return `<div class="row"><div class="idx">${pad(i + 1)}</div>
+      <div><div class="name" style="font-size:clamp(22px,2.4vw,36px)">${esc(j.title || (j.model || "").split("/").pop())}</div>
+        <div class="meta">${esc(j.provider)} · ${esc(j.gpu_name || j.gpu)} · by ${esc(j.requested_by)}</div></div>
+      <div>${prog}<div class="meta">${esc(j.data_leaving_device || "")}</div>
+        ${j.outputs && j.outputs.length ? `<div class="mono" style="margin-top:6px">→ ${j.outputs.map(esc).join(", ")}</div>` : ""}
+        ${j.error ? `<div class="meta stop">${esc(j.error).slice(0, 220)}</div>` : ""}</div>
+      <div><div class="mono">${Math.round(j.gpu_seconds || 0)}s GPU · ${money(spent)}</div>${spark(j.loss_curve)}</div>
+      <div style="text-align:right"><span class="pill ${STATE_CLASS[j.state] || "mutec"}">${j.state.replaceAll("_", " ")}</span>
+        ${j.state === "running" ? `<div style="margin-top:10px"><button onclick="act('cancel','${j.id}')">Stop</button></div>` : ""}</div></div>`;
   }).join("");
 }
 
-const SETUP_URL = { payment_method: (p) => `https://modal.com/settings/${p.workspace}/usage`,
-                    sign_in: () => "https://modal.com/signup" };
-function renderProviders(ps) {
-  $("providers").innerHTML = Object.entries(ps).map(([name, p]) => {
-    const pill = p.ready === true ? `<span class="pill s-completed">ready</span>`
-      : p.ready === false ? `<span class="pill s-pending_approval">needs you</span>` : `<span class="pill s-cancelled">unchecked</span>`;
-    let detail = esc(p.device || p.gpu || p.note || "");
-    let actions = "";
-    if (p.ready === false && p.blocked_on) {
-      const url = SETUP_URL[p.blocked_on] ? SETUP_URL[p.blocked_on](p) : null;
-      detail = p.blocked_on === "payment_method"
-        ? "One step: add a payment method. GPU use still comes out of Modal's $30/mo free credits, and your allowance above caps what agents spend."
-        : p.blocked_on === "sign_in" ? "One step: sign in to Modal." : `blocked on ${esc(p.blocked_on)}`;
-      actions = (url ? `<a href="${url}" target="_blank"><button class="primary">Open Modal</button></a> ` : "") +
-                `<button onclick="connectProvider('${name}', this)">I've done it, verify</button>`;
-    } else if (p.ready === null) {
-      actions = `<button onclick="connectProvider('${name}', this)">Check</button>`;
-    }
-    return `<div class="job" style="grid-template-columns:1fr auto;align-items:center"><div>${pill}
-      <span class="mono" style="margin-left:8px">${esc(name)}</span><div class="meta">${detail}</div></div><div>${actions}</div></div>`;
+function renderSpend(s) {
+  const w = s.wallet;
+  $("wallet").innerHTML = [["available", w.available_usd], ["spent", w.spent_usd], ["monthly cap", w.allowance_usd], ["approval above", w.approval_threshold_usd]]
+    .map(([k, v]) => `<div><div class="idx">${k}</div><div class="figure">${money(v)}</div></div>`).join("");
+  const pending = s.jobs.filter((j) => j.state === "pending_approval");
+  $("approvals").innerHTML = pending.map((j) => `<div class="approval"><div>
+      <div style="font-size:22px;letter-spacing:-.02em"><b>${esc(j.requested_by)}</b> wants up to <b>${money(j.budget_usd)}</b> on ${esc(j.provider)} ${esc(j.gpu)}</div>
+      <div class="meta">${esc(j.model)} · est. ${money(j.est_cost_usd)}, ${mins(j.est_minutes || 0)} · ${esc(j.data_leaving_device)}</div></div>
+      <div style="display:flex;gap:8px"><button class="solid" onclick="act('approve','${j.id}')">Approve</button><button onclick="act('deny','${j.id}')">Deny</button></div></div>`).join("");
+  $("providers").innerHTML = Object.entries(s.providers).map(([name, p], i) => {
+    let action = "", detail = esc(p.device || p.gpu || p.note || "");
+    if (p.ready === false && p.blocked_on === "payment_method") {
+      detail = "One step: add a payment method. GPU use still comes out of Modal’s $30/mo free credits.";
+      action = `<a href="https://modal.com/settings/${esc(p.workspace)}/usage" target="_blank"><button class="solid">Open Modal</button></a> <button onclick="connect('${name}',this)">Verify</button>`;
+    } else if (p.ready == null) action = `<button onclick="connect('${name}',this)">Check</button>`;
+    const pill = p.ready ? `<span class="pill go">ready</span>` : p.ready === false ? `<span class="pill wait">needs you</span>` : `<span class="pill mutec">unchecked</span>`;
+    return `<div class="row" style="grid-template-columns:70px 1fr 2fr 240px"><div class="idx">${pad(i + 1)}</div><div class="name" style="font-size:32px">${esc(name)}</div>
+      <div><div>${pill}</div><div class="meta" style="margin-top:6px">${detail}</div></div><div style="text-align:right">${action}</div></div>`;
   }).join("");
-}
-async function connectProvider(name, btn) {
-  btn.disabled = true; btn.textContent = "checking…";
-  await fetch(`/api/connect?provider=${name}`, { method: "POST" });
-  refresh();
-}
-
-async function refreshMap() {
-  try {
-    const m = await (await fetch("/api/map")).json();
-    $("map").innerHTML = `<tr><th>kind</th><th>name</th><th>compute</th><th>right now</th><th>cost</th><th>usable</th><th>notes</th></tr>` +
-      m.map((e) => {
-        const u = e.utilization || {};
-        const now = e.online === false ? `<span style="color:var(--bad)">offline</span>`
-          : (u.gpu_util_pct != null || u.cpu_load_pct != null) ? `gpu ${u.gpu_util_pct ?? "?"}% · cpu ${u.cpu_load_pct ?? "?"}%` : "";
-        return `<tr><td class="muted">${esc(e.kind)}</td><td class="mono">${esc(e.name)}</td><td>${esc(e.gpu || "")}</td>
-          <td class="mono">${now}</td><td class="mono">${esc(e.cost)}</td>
-          <td>${e.available ? `<span class="pill s-completed">yes</span>` : `<span class="pill s-cancelled">no</span>`}</td>
-          <td class="muted" style="font-size:12px">${esc(e.note || "")}</td></tr>`;
-      }).join("");
-  } catch (e) {}
 }
 
 function renderLog(log) {
-  $("log").innerHTML = `<tr><th>time (UTC)</th><th>event</th><th>detail</th></tr>` + log.map((e) => {
+  $("logt").innerHTML = `<tr><th>time (UTC)</th><th>event</th><th>detail</th></tr>` + log.map((e) => {
     const { ts, event, ...rest } = e;
-    const detail = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  ");
-    return `<tr><td>${esc(ts.slice(5, 19).replace("T", " "))}</td><td>${esc(event)}</td><td>${esc(detail)}</td></tr>`;
+    const d = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  ");
+    return `<tr><td class="mono">${esc(ts.slice(5, 19).replace("T", " "))}</td><td>${esc(event.replaceAll("_", " "))}</td><td class="mono">${esc(d)}</td></tr>`;
   }).join("");
 }
 
+async function act(kind, id) { await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" }); refresh(); }
+async function connect(name, btn) { btn.disabled = true; btn.textContent = "checking…"; await fetch(`/api/connect?provider=${name}`, { method: "POST" }); refresh(); }
+
 async function refresh() {
   try {
-    const s = await (await fetch("/api/state")).json();
-    renderWallet(s.wallet); renderProviders(s.providers); renderJobs(s.jobs); renderLog(s.log);
-    $("updated").textContent = "live · " + new Date().toLocaleTimeString();
-  } catch (e) { $("updated").textContent = "disconnected"; }
+    STATE = await (await fetch("/api/state")).json();
+    renderJobs(STATE.jobs); renderSpend(STATE); renderLog(STATE.log); renderCounters();
+    $("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch (e) { $("clock").textContent = "offline"; }
+}
+async function refreshMap() {
+  try { MAP = await (await fetch("/api/map")).json(); renderMap(); renderCounters(); drawField(); } catch (e) {}
 }
 
 $("qform").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  $("qerr").textContent = ""; $("qtable").innerHTML = ""; $("qsummary").textContent = "pricing…";
-  const params = new URLSearchParams(new FormData(ev.target));
-  const q = await (await fetch("/api/quote?" + params)).json();
-  if (q.error) { $("qerr").textContent = q.error; $("qsummary").textContent = ""; return; }
-  const e = q.estimate, b = e.vram_breakdown_gb;
-  $("qsummary").innerHTML = `<b>${esc(e.model)}</b> · ${e.method} · ${e.tokens.toLocaleString()} tokens · needs <b>${e.vram_needed_gb} GB</b> VRAM
-    (weights+optimizer ${b.weights_and_optimizer} · activations ${b.activations} · overhead ${b.overhead}) <br><span style="font-size:12px">${esc(e.assumptions)}</span>`;
-  const rec = q.recommended_launch;
-  $("qtable").innerHTML = `<tr><th>where</th><th>GPU</th><th>time</th><th>cost</th><th>you pay</th><th>launch</th><th>notes</th></tr>` +
-    q.options.slice(0, 15).map((o) => {
+  $("qsummary").textContent = "pricing…"; $("qtable").innerHTML = "";
+  const q = await (await fetch("/api/quote?" + new URLSearchParams(new FormData(ev.target)))).json();
+  if (q.error) { $("qsummary").textContent = q.error; return; }
+  const e = q.estimate, rec = q.recommended_launch;
+  $("qsummary").innerHTML = `Needs <b>${e.vram_needed_gb} GB</b> VRAM · ${e.tokens.toLocaleString()} tokens · ${esc(e.assumptions)}`;
+  $("qtable").innerHTML = `<tr><th>where</th><th>GPU</th><th>time</th><th>cost</th><th>you pay</th><th></th></tr>` +
+    q.options.slice(0, 12).map((o) => {
       const isRec = rec && o.provider === rec.provider && o.gpu === rec.gpu;
-      const note = o.note || o.needs || (o.available_now ? `${o.available_now} available now` : "");
-      const over = o.within_budget === false ? `<span style="color:var(--bad)">over budget</span> ` : "";
-      return `<tr class="${isRec ? "rec" : ""}"><td>${esc(o.provider)}${isRec ? " ← recommended" : ""}</td><td class="mono">${esc(o.gpu)}</td>
-        <td class="mono">${mins(o.est_minutes)}</td><td class="mono">${money(o.cost_usd)}</td><td class="mono">${money(o.out_of_pocket_usd)}</td>
-        <td>${o.launchable ? "✓" : (o.note || "").startsWith("setup") ? `<span style="color:var(--warn)">setup</span>` : `<span class="muted">manual</span>`}</td><td class="muted">${over}${esc(note)}</td></tr>`;
+      return `<tr><td>${esc(o.provider)}${isRec ? ` <span class="pill go">pick</span>` : ""}</td><td class="mono">${esc(o.gpu)}</td><td class="mono">${mins(o.est_minutes)}</td>
+        <td class="mono">${money(o.cost_usd)}</td><td class="mono">${money(o.out_of_pocket_usd)}</td><td class="meta">${esc(o.note || o.needs || (o.available_now ? o.available_now + " available" : ""))}</td></tr>`;
     }).join("");
-  if (!q.options.length) $("qtable").innerHTML = `<tr><td class="muted">Nothing fits.</td></tr>`;
   $("qnotes").innerHTML = q.notes.map(esc).join("<br>");
 });
 
-refresh();
-setInterval(refresh, 2000);
-refreshMap();
-setInterval(refreshMap, 5000);
+route();
+refresh(); refreshMap();
+setInterval(refresh, 2000); setInterval(refreshMap, 5000);
 </script>
 </body>
 </html>

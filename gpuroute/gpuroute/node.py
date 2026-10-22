@@ -273,8 +273,8 @@ def serve(port=7400, name=None, max_minutes=30, only_when_idle=True, idle_below_
     print(f"\n  gpuroute node '{node.name}' is sharing {gpu}, {node.hw['ram_gb']} GB RAM\n"
           f"  rules: {'only when idle (<' + str(idle_below_pct) + '% busy), ' if only_when_idle else ''}"
           f"max {max_minutes} min per job, one job at a time\n\n"
-          f"  On the machine running your agent, add this node with:\n\n"
-          f"    gpuroute nodes add {node.name} http://{lan_ip()}:{port} {node.token}\n\n"
+          f"  Send this line to whoever runs the agent:\n\n"
+          f"    gpuroute join {node.name}@{lan_ip()}:{port}#{node.token}\n\n"
           f"  Jobs will be listed here as they arrive. Ctrl-C stops sharing.\n", flush=True)
     try:
         srv.serve_forever()

@@ -257,6 +257,32 @@ def cmd_nodes(a):
     cmd_map(a)
 
 
+def cmd_join(a):
+    """gpuroute join iana@172.20.4.131:7400#token"""
+    import re
+    m = re.fullmatch(r"([\w.-]+)@([\w.:-]+)#(\S+)", a.code)
+    if not m:
+        con.print("[red]expected something like[/] iana@172.20.4.131:7400#token  [dim](printed by gpuroute share)[/]")
+        return 1
+    a.action, a.name, a.url, a.token = "add", m.group(1), f"http://{m.group(2)}", m.group(3)
+    return cmd_nodes(a)
+
+
+def cmd_home(a):
+    from . import pool
+    entries = pool.compute_map()
+    usable = [e for e in entries if e["available"]]
+    con.print(f"\n[bold]gpuroute[/]: compute for your agents\n")
+    for e in entries:
+        mark = "[green]●[/]" if e["available"] else ("[red]●[/]" if e.get("online") is False else "[dim]○[/]")
+        con.print(f"  {mark} {e['name']:<10} [dim]{e['kind']:<16}[/] {e.get('gpu') or ''}")
+    con.print(f"\n  {len(usable)} usable now.\n")
+    con.print("  [bold]gpuroute run[/] script.py      run anything on the best idle GPU (deps auto-detected)")
+    con.print("  [bold]gpuroute share[/]              share this machine's idle GPU with your team")
+    con.print("  [bold]gpuroute ui[/]                 open the dashboard")
+    con.print("  [dim]more: gpuroute --help · agents: claude mcp add gpuroute -- gpuroute-mcp[/]\n")
+
+
 def cmd_map(a):
     from . import pool
     entries = pool.compute_map()
@@ -286,8 +312,15 @@ def cmd_run(a):
         return 1
     for t in r.get("skipped", []):
         con.print(f"[dim]skipped {t}[/]")
-    con.print(f"[green]{r['message']}[/]")
-    con.print(f"watch it:  [bold]gpuroute status {r['job_id']} --watch[/]")
+    con.print(f"[green]→ {r['provider']}[/] · {r['gpu']} · deps: {', '.join(r['job'].get('deps') or []) or 'none'}")
+    if sys.stdout.isatty():
+        a.job_id, a.watch, a.json = r["job_id"], True, False
+        cmd_status(a)
+        j = jobs.status(r["job_id"])
+        if j.get("outputs"):
+            con.print(f"results in [bold]{ledger.JOBS / r['job_id'] / 'out'}[/]")
+    else:
+        con.print(f"watch it:  gpuroute status {r['job_id']} --watch")
 
 
 def cmd_mcp_config(a):
@@ -299,7 +332,8 @@ def cmd_mcp_config(a):
 def main():
     ap = argparse.ArgumentParser(prog="gpuroute", description="Size, price and launch GPU training jobs "
                                  "for AI agents, with a hard budget cap.")
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("join", help="add a shared machine: gpuroute join name@ip:port#token").add_argument("code")
     job_args(sub.add_parser("estimate", help="VRAM + time per GPU"))
     job_args(sub.add_parser("quote", help="rank every way to run a job"))
     job_args(sub.add_parser("launch", help="start a job with a budget"), launch=True)
@@ -337,7 +371,7 @@ def main():
     p = sub.add_parser("run", help="run any Python script on the best idle GPU (shared node or this machine)")
     p.add_argument("script", help="path to a .py file; it should write results to ./out")
     p.add_argument("args", nargs="*")
-    p.add_argument("--dep", action="append", help="pip dependency (repeatable), e.g. --dep torch")
+    p.add_argument("--dep", action="append", help="pip dependency (repeatable); default: inferred from imports")
     p.add_argument("--file", action="append", help="input file to send along (repeatable)")
     p.add_argument("--on", default="auto", help="auto, local, or a node name")
     p.add_argument("--min-vram", type=float)
@@ -350,10 +384,12 @@ def main():
     p.add_argument("--port", type=int, default=7311)
     p.add_argument("--no-open", action="store_true")
     a = ap.parse_args()
+    if not a.cmd:
+        return cmd_home(a)
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 
