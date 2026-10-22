@@ -148,9 +148,9 @@
     <div class="cmd"><code id="c1">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute init</code><button class="copy" onclick="copy('c1',this)">Copy</button></div>
   </div>
   <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
-    <div class="idx">(02)</div><div><div class="name">Share</div><div class="meta">On any spare Mac or Linux GPU box. It only takes jobs while idle, and the owner sees each one. Paste the line it prints into <span class="mono">gpuroute join</span>.</div></div>
-    <div style="display:flex;flex-direction:column;gap:8px"><div class="cmd"><code id="c2">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share</code><button class="copy" onclick="copy('c2',this)">Copy</button></div>
-      <div class="cmd"><code>gpuroute join name@ip:7400#token</code><span class="meta">on your machine</span></div></div>
+    <div class="idx">(02)</div><div><div class="name">Pool</div><div class="meta">Run <span class="mono">gpuroute hub</span> once to get your pool code. Then anyone, anywhere (a friend’s gaming PC, a lab box, a teammate’s laptop) joins with one command. It connects outbound, so there’s no network setup. It only takes jobs while idle, and the owner sees each one.</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><div class="cmd"><code>gpuroute hub</code><span class="meta">you, once: prints the pool code</span></div>
+      <div class="cmd"><code id="c2">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --pool "&lt;pool code&gt;" --name &lt;name&gt;</code><button class="copy" onclick="copy('c2',this)">Copy</button></div></div>
   </div>
   <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
     <div class="idx">(03)</div><div><div class="name">Ask</div><div class="meta">Your agent calls compute_map, run_workload, quote_job and launch_job itself.</div></div>

@@ -21,3 +21,12 @@ macOS or Linux. About 1 minute.
 Options: `--max-minutes 10`, `--idle-below 30` (stricter), `--always` (accept jobs even while busy), `--price 0.50` ($/hour, for a future marketplace).
 
 **If the two laptops can't reach each other** (venue wifi often blocks device-to-device traffic): put both on the same phone hotspot and run step 2 again.
+
+### Internet pool: share from anywhere (no LAN needed)
+
+```bash
+gpuroute hub     # you, once: deploys a tiny relay on your Modal account and prints the pool code
+# anyone, on any Mac/Linux/NVIDIA box, anywhere:
+uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --pool "<pool code>" --name friend-pc
+```
+Nodes connect outbound over HTTPS, so venue wifi isolation and home NATs don't matter. Pool machines appear automatically in `compute_map` as **pool node**, and `run_workload(target="friend-pc")` (or `auto`) sends jobs there. The pool secret gates every request.

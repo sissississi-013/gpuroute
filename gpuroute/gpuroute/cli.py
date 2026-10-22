@@ -233,8 +233,40 @@ def cmd_setup(a):
 
 
 def cmd_share(a):
-    from .node import serve
+    from .node import serve, serve_pool
+    if a.pool:
+        return serve_pool(a.pool, a.name, a.max_minutes, not a.always, a.idle_below, a.price)
     serve(a.port, a.name, a.max_minutes, not a.always, a.idle_below, a.price)
+
+
+def cmd_hub(a):
+    """Deploy (or reuse) your internet pool and print the one-line share command for anyone."""
+    import secrets as _s
+    import subprocess
+    from pathlib import Path
+    from . import pool
+    conf = pool.pool_conf()
+    if not conf or a.redeploy:
+        app = Path(__file__).parent / "templates" / "hub_app.py"
+        with con.status("deploying your pool relay to Modal…"):
+            r = subprocess.run([sys.executable, "-m", "modal", "deploy", str(app)], capture_output=True, text=True)
+        import re
+        m = re.search(r"https://\S+\.modal\.run", r.stdout + r.stderr)
+        if not m:
+            con.print(f"[red]deploy failed:[/] {(r.stdout + r.stderr)[-400:]}")
+            return 1
+        import modal
+        secret = (conf or {}).get("secret") or _s.token_urlsafe(16)
+        modal.Dict.from_name("gpuroute-hub", create_if_missing=True).put("secret", secret)
+        conf = {"url": m.group(0), "secret": secret}
+        pool.POOL.write_text(json.dumps(conf))
+        ledger.record("pool_created", url=conf["url"])
+    code = f"{conf['url']}#{conf['secret']}"
+    con.print(f"\n[bold]Your compute pool is live:[/] {conf['url']}\n")
+    con.print("Anyone can add a spare machine from anywhere (no LAN needed), with:\n")
+    con.print(f'  uvx --from "{GIT}" gpuroute share --pool "{code}" --name <their-name>\n')
+    online = [n for n in pool.hub_nodes() if n.get("online")]
+    con.print(f"[dim]{len(online)} machine(s) in the pool right now: {', '.join(n['name'] for n in online) or 'none yet'}[/]")
 
 
 def cmd_nodes(a):
@@ -443,6 +475,9 @@ def main():
     p.add_argument("--idle-below", type=int, default=60, help="accept jobs only while CPU/GPU busy %% is below this")
     p.add_argument("--always", action="store_true", help="accept jobs even while the machine is busy")
     p.add_argument("--price", type=float, default=0.0, help="$/hour to charge (0 = free for your team)")
+    p.add_argument("--pool", help="join an internet pool: the code printed by `gpuroute hub` (url#secret)")
+    sub.add_parser("hub", help="create your internet compute pool and get the share command").add_argument(
+        "--redeploy", action="store_true")
     p = sub.add_parser("nodes", help="list shared nodes, or add/rm one")
     p.add_argument("action", nargs="?", default="list", choices=["list", "add", "rm"])
     p.add_argument("name", nargs="?")
@@ -479,7 +514,7 @@ def main():
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "init": cmd_init, "orbit": cmd_orbit, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "join": cmd_join, "init": cmd_init, "hub": cmd_hub, "orbit": cmd_orbit, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 

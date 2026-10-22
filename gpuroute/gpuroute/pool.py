@@ -10,8 +10,34 @@ from .catalog import FREE_TIERS, MODAL, local_device
 NODES = ledger.HOME / "nodes.json"
 
 
+POOL = ledger.HOME / "pool.json"
+
+
+def pool_conf():
+    return json.loads(POOL.read_text()) if POOL.exists() else None
+
+
+def _hub(method, path, **kw):
+    p = pool_conf()
+    return httpx.request(method, p["url"] + path, headers={"Authorization": f"Bearer {p['secret']}"},
+                         timeout=kw.pop("timeout", 10), **kw)
+
+
+def hub_nodes():
+    if not pool_conf():
+        return []
+    try:
+        return _hub("GET", "/nodes", timeout=8).json()
+    except Exception:
+        return []
+
+
 def nodes():
-    return json.loads(NODES.read_text()) if NODES.exists() else {}
+    """LAN nodes (added with join) plus every machine currently in the internet pool."""
+    n = json.loads(NODES.read_text()) if NODES.exists() else {}
+    for h in hub_nodes():
+        n.setdefault(h["name"], {"hub": True})
+    return n
 
 
 def add_node(name, url, token):
@@ -38,6 +64,13 @@ def _req(name, method, path, **kw):
 
 
 def node_info(name):
+    if nodes().get(name, {}).get("hub"):
+        h = next((x for x in hub_nodes() if x["name"] == name), None)
+        if not h:
+            return {"name": name, "online": False, "accepting_jobs": False, "reason": "left the pool"}
+        if not h.get("online"):
+            return {"name": name, "online": False, "accepting_jobs": False, "reason": "no heartbeat (offline)"}
+        return {**h, "online": True, "via": "pool"}
     try:
         r = _req(name, "GET", "/info", timeout=3)
         r.raise_for_status()
@@ -48,20 +81,40 @@ def node_info(name):
 
 
 def submit(name, payload):
+    if nodes().get(name, {}).get("hub"):
+        r = _hub("POST", f"/node/{name}/submit", json=payload, timeout=30)
+        if r.status_code != 200:
+            return {"ok": False, "error": r.text[:200]}
+        info = node_info(name)
+        gpu = ((info.get("hardware") or {}).get("gpus") or [{"name": "CPU"}])[0]["name"]
+        return {"ok": True, "job_id": payload["job_id"], "node": name, "gpu": gpu,
+                "max_seconds": min(payload["max_seconds"], (info.get("rules") or {}).get("max_minutes", 30) * 60)}
     r = _req(name, "POST", "/jobs", json=payload, timeout=15)
     return r.json()
 
 
 def remote_status(name, job_id):
+    if nodes().get(name, {}).get("hub"):
+        j = _hub("GET", f"/job/{job_id}", timeout=15).json()
+        _OUT_CACHE[job_id] = j.get("outputs") or {}
+        return {**j, "outputs": [{"name": k, "bytes": len(v) * 3 // 4} for k, v in (j.get("outputs") or {}).items()]}
     r = _req(name, "GET", f"/jobs/{job_id}", timeout=6)
     return r.json()
 
 
+_OUT_CACHE = {}
+
+
 def remote_cancel(name, job_id):
+    if nodes().get(name, {}).get("hub"):
+        return _hub("POST", f"/job/{job_id}/cancel").json()
     return _req(name, "POST", f"/jobs/{job_id}/cancel", timeout=6).json()
 
 
 def fetch_output(name, job_id, filename):
+    if nodes().get(name, {}).get("hub"):
+        import base64
+        return base64.b64decode(_OUT_CACHE.get(job_id, {}).get(filename, ""))
     return _req(name, "GET", f"/jobs/{job_id}/out/{filename}", timeout=60).content
 
 
@@ -83,7 +136,7 @@ def compute_map():
         hw = info.get("hardware", {})
         gpu = (hw.get("gpus") or [{}])[0]
         price = (info.get("rules") or {}).get("price_per_hour_usd") or 0
-        entries.append({"kind": "shared node", "name": info["name"], "online": info["online"],
+        entries.append({"kind": "pool node" if info.get("via") == "pool" else "shared node", "name": info["name"], "online": info["online"],
                         "gpu": gpu.get("name") or (f"CPU ({hw.get('cpus')} cores)" if hw else None),
                         "vram_gb": gpu.get("vram_gb"), "ram_gb": hw.get("ram_gb"),
                         "cost": f"${price}/h" if price else "$0 (shared)",

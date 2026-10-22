@@ -282,3 +282,60 @@ def serve(port=7400, name=None, max_minutes=30, only_when_idle=True, idle_below_
         for j in node.busy_jobs():
             os.killpg(j["proc"].pid, signal.SIGTERM)
         print("\nstopped sharing.")
+
+
+# ---------- pool mode: share over the internet through a gpuroute hub ----------
+
+def serve_pool(pool_code, name=None, max_minutes=30, only_when_idle=True, idle_below_pct=60, price_per_hour=0.0):
+    """pool_code: '<hub url>#<secret>'. Connects outbound only; works behind any NAT or venue wifi."""
+    import httpx
+    url, secret = pool_code.split("#", 1)
+    url = url.rstrip("/")
+    node = Node(name, max_minutes, only_when_idle, idle_below_pct, price_per_hour)
+    h = {"Authorization": f"Bearer {secret}"}
+    gpu = node.hw["gpus"][0]["name"] if node.hw["gpus"] else "CPU only"
+    print(f"\n  gpuroute node '{node.name}' joined the pool at {url}\n"
+          f"  sharing {gpu}, {node.hw['ram_gb']} GB RAM · "
+          f"{'only when idle, ' if only_when_idle else ''}max {max_minutes} min per job\n"
+          f"  It's now visible to the pool's agents. Jobs will be listed here. Ctrl-C stops sharing.\n", flush=True)
+    reported = set()
+
+    def push(job_id, final=False):
+        code, st = node.status(job_id)
+        if code != 200:
+            return
+        body = {"running": st["running"], "exit_code": st["exit_code"], "log": st["log"][-15000:],
+                "outputs": {}}
+        if not st["running"]:
+            d = node.jobs[job_id]["dir"] / "out"
+            body["outputs"] = {p.name: base64.b64encode(p.read_bytes()).decode()
+                               for p in d.glob("*") if p.stat().st_size < 15_000_000}
+        httpx.post(f"{url}/job/{job_id}", json=body, headers=h, timeout=60)
+
+    try:
+        while True:
+            try:
+                info = node.info()
+                r = httpx.post(f"{url}/node/{node.name}/beat", json=info, headers=h, timeout=20).json()
+                for cid in r.get("cancel", []):
+                    if cid in node.jobs:
+                        node.cancel(cid)
+                if r.get("job"):
+                    code, res = node.submit(r["job"])
+                    if code != 200:
+                        httpx.post(f"{url}/job/{r['job']['job_id']}", headers=h, timeout=20,
+                                   json={"running": False, "exit_code": -1, "log": res.get("error", ""), "outputs": {}})
+                for jid, j in list(node.jobs.items()):
+                    if jid in reported:
+                        continue
+                    running = j["proc"].poll() is None
+                    push(jid)
+                    if not running:
+                        reported.add(jid)
+            except httpx.HTTPError as e:
+                print(f"  (hub unreachable: {e.__class__.__name__}; retrying)", flush=True)
+            time.sleep(3)
+    except KeyboardInterrupt:
+        for j in node.busy_jobs():
+            os.killpg(j["proc"].pid, signal.SIGTERM)
+        print("\nstopped sharing.")

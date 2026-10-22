@@ -33,6 +33,16 @@ uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpurout
 
 The owner's rules are enforced on their machine: jobs run only while it's idle (CPU/GPU under 60% busy, read from the GPU driver), each job is capped (30 min by default), one job runs at a time, and every job is printed in the owner's terminal with who sent it and what it installs. Ctrl-C stops sharing. See [SHARE.md](SHARE.md).
 
+
+### Internet pool: share from anywhere (no LAN needed)
+
+```bash
+gpuroute hub     # you, once: deploys a tiny relay on your Modal account and prints the pool code
+# anyone, on any Mac/Linux/NVIDIA box, anywhere:
+uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --pool "<pool code>" --name friend-pc
+```
+Nodes connect outbound over HTTPS, so venue wifi isolation and home NATs don't matter. Pool machines appear automatically in `compute_map` as **pool node**, and `run_workload(target="friend-pc")` (or `auto`) sends jobs there. The pool secret gates every request.
+
 ### Run anything on the best idle GPU
 
 ```bash
