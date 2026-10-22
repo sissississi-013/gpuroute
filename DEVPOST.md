@@ -8,6 +8,8 @@
 
 **Source code:** https://github.com/sissississi-013/gpuroute
 
+**Live site:** https://gpuroute-site.vercel.app
+
 **Presentation:** [share the deck link from claude.ai, or export it to PDF/PPTX and upload]
 
 ---
@@ -43,6 +45,11 @@ The budget is enforced in **three layers**:
 Agents get an allowance, never credentials. There is deliberately no MCP tool to approve jobs or change the policy.
 
 ## Public data used
+- **ATLAS Global Data Center Map**: 6,131 datacenters with coordinates (Map tab)
+- **Epoch AI Frontier Data Centers** (CC BY 4.0): frontier AI sites sized by MW, geocoded with OpenStreetMap Nominatim
+- **TeleGeography Submarine Cable Map**: 733 undersea cables
+- **CelesTrak orbital elements**: live positions of orbital compute (Starcloud-1's H100, the ISS's Spaceborne Computer-2) via SGP4
+- Underwater datacenters (Microsoft Natick, Hainan, Shanghai) from public reporting
 - **Vast.ai public GPU pricing feed** (hourly): live price + availability for 15 GPU types
 - **OpenRouter models API**: which models are free to call today
 - **Modal pricing**: per-second GPU prices

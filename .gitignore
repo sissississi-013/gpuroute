@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .mcp.json
 .DS_Store
+gpuroute-site/

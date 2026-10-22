@@ -4,6 +4,8 @@
 
 Compute sits idle everywhere: teammates' laptops, the gaming PC at home, the lab workstation, unused cloud credits. Meanwhile agents only know about the one machine they run on. gpuroute gives agents (Claude Code, Codex, Cursor, anything that speaks MCP) a **map of every machine and provider they can use**, routes any GPU workload to the best idle one, and keeps spending and owner rules in human hands. Workloads include transcription, embeddings, image generation, rendering, batch inference and fine-tuning.
 
+**Live site:** https://gpuroute-site.vercel.app (public snapshot; run `gpuroute ui` for your live dashboard)
+
 Built for the National Renaissance Hackathon at super{set}. Track: **Hacking with Public Data APIs**. It is an MCP server and a CLI built on live public pricing and model data.
 
 ```
@@ -15,6 +17,13 @@ agent ──MCP──▶ compute_map ─┼─ this machine
    ├──▶ run_workload(script, deps, files)  → best idle node → outputs come back
    └──▶ quote_job / launch_job (fine-tunes) → hard budget cap, human approval above a threshold
 ```
+
+### Get started (one command)
+
+```bash
+uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute init
+```
+Checks this machine, connects gpuroute to Claude Code / Codex (prints the config for Cursor), and shows the three commands you need. Then ask your agent: *"What compute can you use right now?"*
 
 ### Share a machine (one command, nothing to pre-install but uv)
 
