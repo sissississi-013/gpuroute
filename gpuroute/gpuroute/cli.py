@@ -115,7 +115,9 @@ def render_job(j):
                      f"loss {p['loss']} · {p['tok_per_s']} tok/s")
     if j.get("loss_curve") and len(j["loss_curve"]) > 1:
         lines.append("loss " + spark(j["loss_curve"]))
-    if j.get("artifact") and j["state"] == "completed":
+    if j.get("outputs"):
+        lines.append(f"[green]outputs:[/] {', '.join(j['outputs'])}  [dim]→ {j['artifact']}[/]")
+    elif j.get("artifact") and j["state"] == "completed":
         lines.append(f"[green]adapter:[/] {j['artifact']}")
     if j.get("error"):
         lines.append(f"[red]{j['error']}[/]")
@@ -230,6 +232,64 @@ def cmd_setup(a):
     con.print(t)
 
 
+def cmd_share(a):
+    from .node import serve
+    serve(a.port, a.name, a.max_minutes, not a.always, a.idle_below, a.price)
+
+
+def cmd_nodes(a):
+    from . import pool
+    if a.action == "add":
+        if not (a.name and a.url and a.token):
+            con.print("usage: gpuroute nodes add <name> <url> <token>")
+            return 1
+        info = pool.add_node(a.name, a.url, a.token)
+        if info["online"]:
+            gpu = (info["hardware"].get("gpus") or [{"name": "CPU only"}])[0]["name"]
+            con.print(f"[green]✓ added {a.name}[/]: {gpu} · "
+                      f"{'idle' if info.get('idle') else 'busy'} · accepting jobs: {info.get('accepting_jobs')}")
+        else:
+            con.print(f"[yellow]added {a.name}, but it's unreachable right now: {info['reason']}[/]")
+        return
+    if a.action == "rm":
+        pool.remove_node(a.name)
+        return con.print(f"removed {a.name}")
+    cmd_map(a)
+
+
+def cmd_map(a):
+    from . import pool
+    entries = pool.compute_map()
+    if getattr(a, "json", False):
+        return print(json.dumps(entries, indent=2))
+    t = Table("kind", "name", "compute", "now", "cost", "usable", "notes")
+    for e in entries:
+        u = e.get("utilization") or {}
+        now = ""
+        if e.get("online") is False:
+            now = "[red]offline[/]"
+        elif u:
+            now = f"cpu {u.get('cpu_load_pct')}% · gpu {u.get('gpu_util_pct') if u.get('gpu_util_pct') is not None else '?'}%"
+        t.add_row(e["kind"], e["name"], str(e.get("gpu") or ""), now, e["cost"],
+                  "[green]yes[/]" if e["available"] else "[dim]no[/]", e.get("note") or "")
+    con.print(t)
+
+
+def cmd_run(a):
+    r = jobs.run_workload(a.script, a.dep or [], a.args or [], a.file or [], needs_gpu=not a.cpu_ok,
+                          min_vram_gb=a.min_vram, max_minutes=a.max_minutes, target=a.on,
+                          requested_by="human:cli")
+    if not r["ok"]:
+        con.print(f"[red bold]not started:[/] {r['error']}")
+        for t in r.get("tried", []):
+            con.print(f"  [dim]skipped {t}[/]")
+        return 1
+    for t in r.get("skipped", []):
+        con.print(f"[dim]skipped {t}[/]")
+    con.print(f"[green]{r['message']}[/]")
+    con.print(f"watch it:  [bold]gpuroute status {r['job_id']} --watch[/]")
+
+
 def cmd_mcp_config(a):
     import shutil
     exe = shutil.which("gpuroute-mcp") or f"{sys.prefix}/bin/gpuroute-mcp"
@@ -260,6 +320,29 @@ def main():
     sub.add_parser("free-models", help="AI models free on OpenRouter right now").add_argument(
         "--limit", type=int, default=15)
     sub.add_parser("mcp-config", help="print the command to add gpuroute to Claude Code")
+    p = sub.add_parser("share", help="share this machine's idle compute with your agents/team")
+    p.add_argument("--port", type=int, default=7400)
+    p.add_argument("--name")
+    p.add_argument("--max-minutes", type=int, default=30, help="cap per job")
+    p.add_argument("--idle-below", type=int, default=40, help="accept jobs only while CPU/GPU busy %% is below this")
+    p.add_argument("--always", action="store_true", help="accept jobs even while the machine is busy")
+    p.add_argument("--price", type=float, default=0.0, help="$/hour to charge (0 = free for your team)")
+    p = sub.add_parser("nodes", help="list shared nodes, or add/rm one")
+    p.add_argument("action", nargs="?", default="list", choices=["list", "add", "rm"])
+    p.add_argument("name", nargs="?")
+    p.add_argument("url", nargs="?")
+    p.add_argument("token", nargs="?")
+    sub.add_parser("map", help="every compute resource your agents can reach, and how busy it is").add_argument(
+        "--json", action="store_true")
+    p = sub.add_parser("run", help="run any Python script on the best idle GPU (shared node or this machine)")
+    p.add_argument("script", help="path to a .py file; it should write results to ./out")
+    p.add_argument("args", nargs="*")
+    p.add_argument("--dep", action="append", help="pip dependency (repeatable), e.g. --dep torch")
+    p.add_argument("--file", action="append", help="input file to send along (repeatable)")
+    p.add_argument("--on", default="auto", help="auto, local, or a node name")
+    p.add_argument("--min-vram", type=float)
+    p.add_argument("--max-minutes", type=float, default=15)
+    p.add_argument("--cpu-ok", action="store_true", help="job doesn't need a GPU")
     p = sub.add_parser("setup", help="provider readiness, or connect one: gpuroute setup modal")
     p.add_argument("provider", nargs="?")
     p.add_argument("--no-open", action="store_true", help="don't open the browser")
@@ -270,7 +353,7 @@ def main():
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "setup": cmd_setup, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "share": cmd_share, "nodes": cmd_nodes, "map": cmd_map, "run": cmd_run, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 

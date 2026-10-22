@@ -50,6 +50,9 @@ class Handler(BaseHTTPRequestHandler):
                             budget_usd=float(q["budget"]) if q.get("budget") else None,
                             params_b=float(q["params_b"]) if q.get("params_b") else None)
                 return self.send(res)
+            if u.path == "/api/map":
+                from . import pool
+                return self.send(pool.compute_map())
             if u.path == "/api/free-models":
                 models, total, _ = data.free_models(12)
                 return self.send({"models": models, "total": total})

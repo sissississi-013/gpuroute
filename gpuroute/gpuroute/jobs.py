@@ -7,6 +7,7 @@ Budget enforcement happens in three layers:
      stops itself at its time cap.
   3. settlement: the actual cost is computed from GPU runtime and written to the ledger
 """
+import base64
 import json
 import math
 import os
@@ -168,7 +169,9 @@ def _start(job):
 def status(job_id):
     job = ledger.load_job(job_id)
     if job["state"] in TERMINAL or job["state"] == "pending_approval":
-        return _public(job)
+        return {**_public(job), **({"outputs": job["outputs"]} if job.get("outputs") else {})}
+    if job.get("kind") == "script":
+        return _script_status(job)
     log_path = ledger.JOBS / job_id / "run.log"
     text = log_path.read_text(errors="replace") if log_path.exists() else ""
     events = _events(text)
@@ -233,6 +236,12 @@ def cancel(job_id):
         ledger.save_job(job)
         ledger.record("cancelled", job=job_id)
         return {"ok": True, "state": "cancelled"}
+    if job["provider"].startswith("node:"):
+        from . import pool
+        try:
+            pool.remote_cancel(job["node"], job_id)
+        except Exception:
+            pass
     if job["provider"] == "modal":
         subprocess.run([shutil.which("modal") or "modal", "app", "stop", job["app_name"]],
                        capture_output=True, timeout=60)
@@ -314,8 +323,149 @@ def _data_leaving_device(dataset, provider):
 
 
 def _public(job):
-    keys = ["id", "state", "phase", "provider", "gpu", "gpu_name", "model", "dataset", "examples",
+    keys = ["id", "state", "phase", "provider", "gpu", "gpu_name", "title", "deps", "model", "dataset", "examples",
             "budget_usd", "hard_timeout_s", "est_cost_usd", "est_minutes", "cost_so_far_usd",
             "actual_cost_usd", "gpu_seconds", "progress", "loss_curve", "artifact", "error",
-            "data_leaving_device", "requested_by"]
+            "data_leaving_device", "requested_by", "outputs"]
     return {k: job[k] for k in keys if job.get(k) is not None}
+
+
+# ---------- generic workloads: any script, on a shared node or this machine ----------
+
+MAX_UPLOAD = 50 * 1024 * 1024
+
+
+def run_workload(script, deps=(), args=(), files=(), title=None, needs_gpu=True, min_vram_gb=None,
+                 max_minutes=15, target="auto", requested_by="agent"):
+    """script: path to a .py file or inline Python. files: local input files copied next to it.
+    The script should write results into ./out (or $GPUROUTE_OUT); they come back to this machine."""
+    from . import pool
+    from .node import hardware
+
+    code = Path(script).read_text() if script.endswith(".py") and Path(script).exists() else script
+    title = title or (Path(script).name if script.endswith(".py") else "inline script")
+    files = [str(Path(f).expanduser().resolve()) for f in files]
+    missing = [f for f in files if not Path(f).exists()]
+    if missing:
+        return {"ok": False, "error": f"input files not found: {missing}"}
+    if sum(Path(f).stat().st_size for f in files) > MAX_UPLOAD:
+        return {"ok": False, "error": "input files exceed 50 MB; pass URLs the script downloads instead"}
+
+    # Pick where to run: idle shared nodes first (they'd otherwise sit unused, and it keeps
+    # this machine free), then this machine.
+    tried = []
+    candidates = []
+    if target in ("auto",) or target not in ("local",):
+        names = [target] if target not in ("auto", "local") else list(pool.nodes())
+        for info in map(pool.node_info, names):
+            gpus = (info.get("hardware") or {}).get("gpus") or []
+            vram = max((g.get("vram_gb") or 0 for g in gpus), default=0)
+            if not info.get("accepting_jobs"):
+                tried.append(f"{info['name']}: {info.get('reason')}")
+            elif needs_gpu and not gpus:
+                tried.append(f"{info['name']}: no GPU")
+            elif min_vram_gb and vram < min_vram_gb:
+                tried.append(f"{info['name']}: {vram} GB < {min_vram_gb} GB needed")
+            else:
+                candidates.append((-vram, info))
+    candidates.sort(key=lambda c: c[0])
+    if candidates:
+        where = ("node", candidates[0][1])
+    elif target in ("auto", "local"):
+        hw = hardware()
+        if needs_gpu and not hw["gpus"]:
+            return {"ok": False, "error": "no GPU available locally and no shared node accepting jobs",
+                    "tried": tried}
+        where = ("local", None)
+    else:
+        return {"ok": False, "error": f"node {target} can't take this job", "tried": tried}
+
+    job_id = time.strftime("%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
+    d = ledger.JOBS / job_id
+    d.mkdir(parents=True, exist_ok=True)
+    job = {"id": job_id, "kind": "script", "created": time.time(), "title": title, "model": title,
+           "deps": list(deps), "args": list(args), "files": [Path(f).name for f in files],
+           "budget_usd": 0.0, "price_per_s": 0.0, "est_cost_usd": 0.0, "requested_by": requested_by,
+           "hard_timeout_s": int(max_minutes * 60), "state": "running", "actual_cost_usd": None,
+           "started": time.time(), "artifact": str(d / "out")}
+
+    if where[0] == "node":
+        info = where[1]
+        payload = {"script": code, "deps": list(deps), "args": list(args), "title": title,
+                   "max_seconds": job["hard_timeout_s"], "job_id": job_id, "requester": requested_by,
+                   "files": {Path(f).name: base64.b64encode(Path(f).read_bytes()).decode() for f in files}}
+        r = pool.submit(info["name"], payload)
+        if not r.get("ok"):
+            return {"ok": False, "error": r.get("error"), "tried": tried}
+        gpu = r.get("gpu")
+        job.update(provider=f"node:{info['name']}", node=info["name"], gpu=gpu,
+                   hard_timeout_s=r["max_seconds"],
+                   data_leaving_device=(f"script{' + ' + str(len(files)) + ' input file(s)' if files else ''} "
+                                        f"sent to shared node '{info['name']}'"))
+    else:
+        proc = start_local(d, code, deps, args, files, job["hard_timeout_s"])
+        job.update(provider="local", gpu=local_device()["name"] if local_device() else "CPU", pid=proc.pid,
+                   data_leaving_device="none: runs on this machine")
+    ledger.save_job(job)
+    ledger.record("launched", job=job_id, kind="script", provider=job["provider"], title=title,
+                  deps=list(deps), cap_s=job["hard_timeout_s"], data_leaving_device=job["data_leaving_device"],
+                  requested_by=requested_by)
+    return {"ok": True, "job_id": job_id, "provider": job["provider"], "gpu": job["gpu"],
+            "skipped": tried, "job": _public(job),
+            "message": f"Running '{title}' on {job['provider']} ({job['gpu']}), capped at "
+                       f"{job['hard_timeout_s'] // 60} min. Poll job_status('{job_id}'); outputs land in "
+                       f"{job['artifact']}."}
+
+
+def start_local(d, code, deps, args, files, max_seconds):
+    from .node import start_script
+    for f in files:
+        shutil.copy(f, Path(d) / Path(f).name)
+    return start_script(d, code, deps, args, max_seconds)
+
+
+def _script_status(job):
+    from . import pool
+    d = ledger.JOBS / job["id"]
+    if job["provider"].startswith("node:"):
+        try:
+            r = pool.remote_status(job["node"], job["id"])
+        except Exception as e:
+            job["phase"] = f"node unreachable ({e.__class__.__name__}); retrying"
+            return _public(job)
+        text = r.get("log", "")
+        (d / "run.log").write_text(text)
+        alive = r.get("running", False)
+        if not alive:
+            (d / "out").mkdir(exist_ok=True)
+            for o in r.get("outputs", []):
+                if o["bytes"] < MAX_UPLOAD and not (d / "out" / o["name"]).exists():
+                    (d / "out" / o["name"]).write_bytes(pool.fetch_output(job["node"], job["id"], o["name"]))
+    else:
+        text = (d / "run.log").read_text(errors="replace") if (d / "run.log").exists() else ""
+        alive = _alive(job.get("pid"))
+    events = _events(text)
+    last = lambda name: next((e for e in reversed(events) if e["event"] == name), None)  # noqa: E731
+    started = last("started")
+    end_ev = last("finished") or last("exited") or last("stopped_at_budget")
+    progress = [e for e in events if e["event"] == "progress"]
+    if started:
+        end = end_ev["t"] if end_ev else time.time()
+        job["gpu_seconds"] = round(end - started["t"], 1)
+        job["gpu_name"] = started.get("gpu")
+    if progress:
+        job["progress"] = {k: progress[-1].get(k) for k in ("step", "steps", "loss", "tok_per_s")}
+    job["outputs"] = [p.name for p in sorted((d / "out").glob("*"))] if (d / "out").exists() else []
+    if not alive and job["state"] == "running":
+        if last("stopped_at_budget"):
+            _settle(job, "stopped_at_budget", job.get("gpu_seconds", 0))
+        elif last("finished"):
+            _settle(job, "completed", job.get("gpu_seconds", 0))
+        else:
+            _settle(job, "failed", job.get("gpu_seconds", 0), error=_tail(text))
+    ledger.save_job(job)
+    out = _public(job)
+    out["outputs"] = job["outputs"]
+    if job["state"] == "running":
+        out["log_tail"] = _tail(text, 6)
+    return out

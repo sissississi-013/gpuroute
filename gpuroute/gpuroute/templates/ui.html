@@ -82,7 +82,10 @@
     <div class="bar" id="walletbar"></div>
   </div>
 
-  <h2>Compute providers</h2>
+  <h2>Compute you can reach</h2>
+  <div class="panel scroll"><table id="map"></table></div>
+
+  <h2>Provider setup</h2>
   <div class="panel" id="providers"></div>
 
   <div id="approvals"></div>
@@ -166,7 +169,8 @@ function renderJobs(jobs) {
       <div class="meta mono">spent ${money(spent)} of ${money(j.budget_usd)} budget · GPU ${Math.round(j.gpu_seconds || 0)}s / cap ${j.hard_timeout_s}s</div>
       <div class="meta">data leaving device: ${esc(j.data_leaving_device)}</div>
       ${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}
-      ${j.state === "completed" && j.artifact ? `<div class="meta mono">adapter → ${esc(j.artifact)}</div>` : ""}
+      ${j.outputs && j.outputs.length ? `<div class="meta mono">outputs: ${j.outputs.map(esc).join(", ")} → ${esc(j.artifact)}</div>`
+        : j.state === "completed" && j.artifact ? `<div class="meta mono">adapter → ${esc(j.artifact)}</div>` : ""}
       ${j.state === "running" ? `<div style="margin-top:8px"><button class="danger" onclick="act('cancel','${j.id}')">Stop job</button></div>` : ""}
     </div><div>${spark(j.loss_curve)}</div></div>`;
   }).join("");
@@ -198,6 +202,22 @@ async function connectProvider(name, btn) {
   btn.disabled = true; btn.textContent = "checking…";
   await fetch(`/api/connect?provider=${name}`, { method: "POST" });
   refresh();
+}
+
+async function refreshMap() {
+  try {
+    const m = await (await fetch("/api/map")).json();
+    $("map").innerHTML = `<tr><th>kind</th><th>name</th><th>compute</th><th>right now</th><th>cost</th><th>usable</th><th>notes</th></tr>` +
+      m.map((e) => {
+        const u = e.utilization || {};
+        const now = e.online === false ? `<span style="color:var(--bad)">offline</span>`
+          : (u.gpu_util_pct != null || u.cpu_load_pct != null) ? `gpu ${u.gpu_util_pct ?? "?"}% · cpu ${u.cpu_load_pct ?? "?"}%` : "";
+        return `<tr><td class="muted">${esc(e.kind)}</td><td class="mono">${esc(e.name)}</td><td>${esc(e.gpu || "")}</td>
+          <td class="mono">${now}</td><td class="mono">${esc(e.cost)}</td>
+          <td>${e.available ? `<span class="pill s-completed">yes</span>` : `<span class="pill s-cancelled">no</span>`}</td>
+          <td class="muted" style="font-size:12px">${esc(e.note || "")}</td></tr>`;
+      }).join("");
+  } catch (e) {}
 }
 
 function renderLog(log) {
@@ -241,6 +261,8 @@ $("qform").addEventListener("submit", async (ev) => {
 
 refresh();
 setInterval(refresh, 2000);
+refreshMap();
+setInterval(refreshMap, 5000);
 </script>
 </body>
 </html>

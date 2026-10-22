@@ -11,7 +11,10 @@ from .estimate import estimate
 from .quote import quote
 
 mcp = MCPServer("gpuroute", instructions=(
-    "Use gpuroute whenever a task needs GPU compute for training or fine-tuning. "
+    "Use gpuroute whenever a task needs GPU or heavy compute: training, fine-tuning, transcription, "
+    "embeddings, image/video generation, rendering, batch inference. Call compute_map first to see every "
+    "machine you can use (including teammates' idle GPUs), use run_workload for arbitrary scripts and "
+    "quote_job/launch_job for LoRA fine-tunes. "
     "If a provider isn't ready, call connect_provider: it does the setup itself and only hands the user "
     "the one step that needs a human (sign-in or payment method), already opened in their browser. "
     "Always call quote_job before launch_job, pick a budget that covers the estimate, and "
@@ -66,6 +69,50 @@ def launch_job(model: str, dataset: str, budget_usd: float, examples: int = 1000
     """
     return jobs.launch(model, dataset, budget_usd, examples=examples, seq_len=seq_len, epochs=epochs,
                        provider=provider, gpu=gpu, max_minutes=max_minutes, requested_by="agent:mcp")
+
+
+@mcp.tool()
+def compute_map() -> list:
+    """Every compute resource you can use, and how busy each is right now: this machine, shared
+    nodes (teammates' idle GPUs, lab boxes, gaming PCs running `gpuroute share`), cloud providers,
+    the live spare-GPU market, and free tiers. Call this before assuming you only have this machine."""
+    from . import pool
+    return pool.compute_map()
+
+
+@mcp.tool()
+def run_workload(script: str, deps: list[str] = [], args: list[str] = [], files: list[str] = [],
+                 needs_gpu: bool = True, min_vram_gb: float | None = None, max_minutes: float = 15,
+                 target: str = "auto") -> dict:
+    """Run ANY Python workload (transcription, embeddings, image generation, rendering, batch
+    inference, benchmarks, training) on the best available compute: an idle shared node first,
+    then this machine. The node owner's rules (idle-only, minutes cap) are enforced on their side.
+
+    script: absolute path to a .py file, or inline Python. It should write results into ./out
+            (also $GPUROUTE_OUT); they are copied back here when the job ends.
+    deps: pip packages the script needs (installed in a throwaway env on the target), e.g. ["torch"].
+    files: absolute paths of local input files to send along (≤50 MB total); they sit next to the script.
+    target: "auto", "local", or a node name from compute_map.
+    """
+    return jobs.run_workload(script, deps, args, files, needs_gpu=needs_gpu, min_vram_gb=min_vram_gb,
+                             max_minutes=max_minutes, target=target, requested_by="agent:mcp")
+
+
+@mcp.tool()
+def read_output(job_id: str, filename: str, max_chars: int = 20000) -> dict:
+    """Read a text output (json, txt, csv, md) a finished job wrote to ./out. For binary files
+    (e.g. .npy) returns the path and size instead."""
+    from pathlib import Path
+    out = ledger.JOBS / job_id / "out"
+    f = out / Path(filename).name
+    if not f.exists():
+        return {"error": f"no output {filename!r}", "available": sorted(p.name for p in out.glob("*"))
+                if out.exists() else []}
+    if f.suffix.lower() in (".json", ".txt", ".csv", ".md", ".log", ".jsonl", ".srt", ".vtt"):
+        text = f.read_text(errors="replace")
+        return {"file": str(f), "bytes": f.stat().st_size, "content": text[:max_chars],
+                "truncated": len(text) > max_chars}
+    return {"file": str(f), "bytes": f.stat().st_size, "note": "binary file; use the path"}
 
 
 @mcp.tool()
