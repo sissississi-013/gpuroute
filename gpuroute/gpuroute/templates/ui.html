@@ -88,6 +88,30 @@
   html.static #qform button { display: inline-block; }
   .snapnote { display: none; }
   html.static .snapnote { display: block; }
+  .mapbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .mapbar input { max-width: 520px; flex: 1 1 320px; font-family: var(--sans); font-size: 15px; padding: 11px 14px; border-radius: 999px; }
+  #chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font: 500 13px var(--sans); border-radius: 999px; padding: 6px 12px; border: 1px solid var(--line); cursor: pointer;
+          background: var(--paper); color: var(--mute); display: inline-flex; gap: 6px; align-items: center; user-select: none; }
+  .chip.on { border-color: var(--ink); color: var(--ink); }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .mapwrap { display: grid; grid-template-columns: 1fr 340px; gap: 0; border: 1px solid var(--ink); border-radius: 14px; overflow: hidden; }
+  .mapstage { position: relative; background: #fbfaf7; }
+  #world { width: 100%; height: auto; display: block; cursor: grab; }
+  #world:active { cursor: grabbing; }
+  #tip { position: absolute; pointer-events: none; display: none; background: #0d0d0c; color: #fff; font-size: 13px;
+         padding: 8px 10px; border-radius: 6px; max-width: 280px; line-height: 1.35; z-index: 3; }
+  .zoombtns { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .zoombtns button { width: 34px; height: 34px; padding: 0; background: var(--paper); font-size: 18px; line-height: 1; }
+  .mapstat { position: absolute; right: 12px; bottom: 12px; color: var(--mute); font-size: 12px; background: rgba(255,255,255,.8); padding: 4px 8px; border-radius: 6px; }
+  .panel { border-left: 1px solid var(--ink); padding: 20px; max-height: 720px; overflow-y: auto; background: var(--paper); }
+  .panel h3 { font-size: 30px; font-weight: 500; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 10px; }
+  .panel .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 14px; margin: 14px 0; }
+  .panel .kv div:nth-child(odd) { color: var(--mute); }
+  .panel .agentq { background: #0d0d0c; color: #f1f0ea; border-radius: 10px; padding: 12px; font: 12px/1.5 var(--mono); margin-top: 14px; word-break: break-word; }
+  .panel .res { padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; font-size: 14px; }
+  .panel .res:hover { color: var(--go); }
+  @media (max-width: 900px) { .mapwrap { grid-template-columns: 1fr; } .panel { border-left: none; border-top: 1px solid var(--ink); } }
   .empty { color: var(--mute); padding: 32px 0; border-top: 1px solid var(--line); font-size: 18px; }
   @media (max-width: 820px) {
     .row { grid-template-columns: 40px 1fr; } .row > :nth-child(n+3) { grid-column: 2; }
@@ -136,12 +160,20 @@
 
 <section class="tab" id="map">
   <h2 class="big">Map<sup>(land/sea/orbit)</sup></h2>
-  <p class="lede">Where the world’s compute physically is, and how much of it your agent can actually use. Green is usable now. Everything else is the gap gpuroute closes, one machine at a time.</p>
-  <div style="position:relative">
-    <svg id="world" viewBox="0 0 1600 820" style="width:100%;height:auto;display:block" role="img" aria-label="World map of datacenters, undersea cables, underwater datacenters and orbital compute"></svg>
-    <div id="tip" style="position:absolute;pointer-events:none;display:none;background:#0d0d0c;color:#fff;font-size:13px;padding:8px 10px;border-radius:6px;max-width:300px"></div>
+  <p class="lede">Where the world’s compute physically is, and how much of it your agent can actually use. Agents query the same data with <span class="mono">world_compute</span>.</p>
+  <div class="mapbar">
+    <input id="msearch" placeholder="Search datacenters, operators, cities (e.g. Equinix, Frankfurt, Microsoft)" autocomplete="off">
+    <div id="chips"></div>
   </div>
-  <div class="row" style="grid-template-columns:70px 1fr 1fr 1fr 1fr;margin-top:24px" id="maplegend"></div>
+  <div class="mapwrap">
+    <div class="mapstage">
+      <svg id="world" viewBox="0 0 1600 820" role="img" aria-label="Interactive world map of compute: datacenters, frontier AI sites, undersea cables, underwater datacenters and satellites"></svg>
+      <div id="tip"></div>
+      <div class="zoombtns"><button onclick="zoomBy(1.6)">+</button><button onclick="zoomBy(1/1.6)">−</button><button onclick="zoomReset()">⟲</button></div>
+      <div class="mapstat mono" id="mapstat"></div>
+    </div>
+    <aside class="panel" id="panel"></aside>
+  </div>
   <p class="idx" style="margin-top:56px">(ORBITAL MARKET: COMPUTE + RELAY, NEXT 6 HOURS)</p>
   <p class="lede" style="margin:8px 0 16px">Agents buy GPU time aboard satellites while they’re sunlit, plus ground-station passes to downlink results: <span class="mono">orbital_offers</span> → <span class="mono">book_orbital</span>. Windows and passes come from the real orbits. Operator listings and prices are mock, and jobs are emulated on ground GPUs.</p>
   <div class="scroll"><table id="orbitt"></table></div>
@@ -310,51 +342,158 @@ function renderLog(log) {
   }).join("");
 }
 
-/* ---------- world map ---------- */
-let WORLD = null, orbitTimer = null;
+/* ---------- world map (interactive) ---------- */
+let WORLD = null, orbitTimer = null, ZOOM = null, ZK = 1, SEL = null;
+const LAYERS = [
+  { id: "usable", label: "Usable now", color: "#2f7d5b", on: true },
+  { id: "orbit", label: "Orbit (live)", color: "#e8642c", on: true },
+  { id: "frontier", label: "Frontier AI sites", color: "#0d0d0c", on: true },
+  { id: "datacenters", label: "Datacenters", color: "#8a8880", on: true },
+  { id: "undersea", label: "Underwater DCs", color: "#3b6fd8", on: true },
+  { id: "cables", label: "Undersea cables", color: "#9db4ea", on: true },
+];
+const isOn = (id) => LAYERS.find((l) => l.id === id).on;
 async function loadWorld() {
   if (WORLD) return WORLD;
   const j = (u) => fetch(u).then((r) => r.json());
   const [land, atlas, cables, epoch, undersea, orbit] = await Promise.all([
-    j("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"), j("/static/geo/atlas.json"), j("/static/geo/cables.json"),
-    j("/static/geo/epoch.json").catch(() => []), j("/static/geo/undersea.json"), j("/static/geo/orbit.json")]);
+    j("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"), j("static/geo/atlas.json"), j("static/geo/cables.json"),
+    j("static/geo/epoch.json"), j("static/geo/undersea.json"), j("static/geo/orbit.json")]);
   WORLD = { land: topojson.feature(land, land.objects.land), atlas, cables, epoch, undersea, orbit };
   return WORLD;
 }
+function renderChips() {
+  $("chips").innerHTML = LAYERS.map((l) => `<span class="chip ${l.on ? "on" : ""}" onclick="toggleLayer('${l.id}')"><i style="background:${l.color}"></i>${l.label}</span>`).join("");
+}
+function toggleLayer(id) { const l = LAYERS.find((x) => x.id === id); l.on = !l.on; renderChips(); applyVisibility(); }
+function applyVisibility() { LAYERS.forEach((l) => d3.select("#world").selectAll(`.L-${l.id}`).style("display", l.on ? null : "none")); }
+function zoomBy(f) { d3.select("#world").transition().duration(350).call(ZOOM.scaleBy, f); }
+function zoomReset() { d3.select("#world").transition().duration(450).call(ZOOM.transform, d3.zoomIdentity); }
+let PROJ = null;
+function zoomTo(points) {
+  if (!points.length) return;
+  const xy = points.map((p) => PROJ(p)).filter(Boolean);
+  const [x0, x1] = d3.extent(xy, (d) => d[0]), [y0, y1] = d3.extent(xy, (d) => d[1]);
+  const k = Math.min(12, 0.8 / Math.max((x1 - x0 + 40) / 1600, (y1 - y0 + 40) / 820));
+  d3.select("#world").transition().duration(650).call(ZOOM.transform,
+    d3.zoomIdentity.translate(800, 410).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+}
+function panel(html) { $("panel").innerHTML = html; }
+function agentQ(call) { return `<div class="idx" style="margin-top:16px">(YOUR AGENT ASKS)</div><div class="agentq">${esc(call)}</div>`; }
+function defaultPanel() {
+  const W = WORLD, mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
+  const totalMW = d3.sum(W.epoch, (d) => d.mw);
+  panel(`<div class="idx">(OVERVIEW)</div><h3>${W.atlas.length.toLocaleString()} datacenters, ${W.epoch.length} frontier AI sites, ${W.orbit.length} in orbit</h3>
+    <div class="kv"><div>usable now</div><div><b style="color:var(--go)">${mine.length}</b> machine${mine.length === 1 ? "" : "s"}: ${mine.map((e) => esc(e.name)).join(", ") || "this one"}</div>
+    <div>frontier power</div><div>${Math.round(totalMW).toLocaleString()} MW across ${W.epoch.length} sites</div>
+    <div>undersea</div><div>${W.cables.length} cables · ${W.undersea.length} underwater DCs</div>
+    <div>orbit</div><div>${W.orbit.map((o) => esc(o.name)).join(", ")}: bookable via book_orbital (mock market)</div></div>
+    <p class="meta">Click anything on the map, or search. Scroll to zoom, drag to pan.</p>
+    ${agentQ('world_compute(near="frankfurt", radius_km=100)')}`);
+}
+function selectItem(kind, d) {
+  SEL = { kind, d };
+  if (kind === "dc") panel(`<div class="idx">(DATACENTER · ATLAS)</div><h3>${esc(d[2])}</h3>
+      <div class="kv"><div>operator</div><div>${esc(d[3] || "—")}</div><div>city</div><div>${esc(d[4] || "—")}</div><div>country</div><div>${esc(d[5] || "—")}</div>
+      <div>agent access</div><div>colocation: rentable by contract, not by API</div></div>
+      ${agentQ(`world_compute(layer="datacenters", lat=${d[1]}, lon=${d[0]}, radius_km=50)`)}`);
+  if (kind === "frontier") panel(`<div class="idx">(FRONTIER AI SITE · EPOCH AI)</div><h3>${esc(d.name)}</h3>
+      <div class="kv"><div>owner</div><div>${esc(d.owner)}</div><div>power</div><div>${Math.round(d.mw)} MW</div>
+      <div>compute</div><div>${Math.round(d.h100e).toLocaleString()} H100-equivalents</div><div>country</div><div>${esc(d.country)}</div>
+      <div>agent access</div><div>private: not rentable</div></div>
+      ${agentQ(`world_compute(layer="frontier", owner="${(d.owner || "").split(" ")[0]}")`)}`);
+  if (kind === "undersea") panel(`<div class="idx">(UNDERWATER DATACENTER)</div><h3>${esc(d.name)}</h3>
+      <div class="kv"><div>status</div><div>${esc(d.status)}</div><div>what</div><div>${esc(d.what)}</div><div>location</div><div>approximate (public reporting)</div>
+      <div>agent access</div><div>not rentable</div></div>${agentQ('world_compute(layer="undersea")')}`);
+  if (kind === "usable") panel(`<div class="idx">(USABLE NOW)</div><h3>Your agent can run here</h3>
+      <div class="kv">${d.map((e) => `<div>${esc(e.name)}</div><div>${esc(e.gpu)} · ${e.available ? "idle" : "busy"}</div>`).join("")}</div>
+      ${agentQ('run_workload("embed.py", target="auto")')}`);
+  if (kind === "sat") {
+    api("/api/orbit").then((o) => {
+      const mine = o.offers.filter((x) => x.satellite === d.name);
+      const pos = mine.find((x) => x.type === "position") || {};
+      const comp = mine.filter((x) => x.type === "compute").slice(0, 3), rel = mine.filter((x) => x.type === "relay").slice(0, 3);
+      panel(`<div class="idx">(ORBITAL COMPUTE · LIVE)</div><h3>${esc(d.name)}</h3>
+        <div class="kv"><div>now</div><div>${pos.alt_km} km up · ${pos.lat}, ${pos.lon} · ${pos.sunlit_now ? "☀ sunlit" : "in eclipse"}</div>
+        <div>hardware</div><div>${esc(d.what)}</div></div>
+        <div class="idx">(COMPUTE WINDOWS)</div>${comp.map((c) => `<div class="res">${esc(c.offer_id)} · ${esc(c.window)}<div class="meta">${esc(c.hardware)} · $${c.usd_per_gpu_min}/GPU-min · downlink ${esc(c.next_downlink)}</div></div>`).join("")}
+        <div class="idx" style="margin-top:12px">(DOWNLINK PASSES)</div>${rel.map((r) => `<div class="res">${esc(r.operator.replace(" (mock listing)", ""))} · ${esc(r.window)}<div class="meta">${r.capacity_gb} GB · ${r.max_elevation_deg}° max</div></div>`).join("")}
+        <p class="meta" style="font-size:12px">Orbits and passes are live (SGP4). Listings and prices are mock.</p>
+        ${agentQ(comp[0] ? `book_orbital("${comp[0].offer_id}", "benchmark.py", budget_usd=1)` : 'orbital_offers()')}`);
+    });
+  }
+}
+function doSearch(q) {
+  q = q.trim().toLowerCase();
+  const g = d3.select("#world");
+  g.selectAll(".hit").classed("hit", false).attr("r", null);
+  if (q.length < 2) { g.selectAll(".dc").attr("fill-opacity", .35); defaultPanel(); return; }
+  const W = WORLD;
+  const dcs = W.atlas.filter((r) => [r[2], r[3], r[4], r[5]].some((f) => (f || "").toLowerCase().includes(q)));
+  const fr = W.epoch.filter((d) => [d.name, d.owner, d.country].some((f) => (f || "").toLowerCase().includes(q)));
+  const set = new Set(dcs);
+  g.selectAll(".dc").attr("fill-opacity", (d) => set.has(d) ? .9 : .06).attr("fill", (d) => set.has(d) ? "#2f7d5b" : "#0d0d0c");
+  const ops = d3.rollups(dcs, (v) => v.length, (r) => r[3] || "?").sort((a, b) => b[1] - a[1]).slice(0, 6);
+  panel(`<div class="idx">(SEARCH)</div><h3>“${esc(q)}”</h3>
+    <div class="kv"><div>datacenters</div><div>${dcs.length}</div><div>frontier AI</div><div>${fr.length}</div>
+    <div>top operators</div><div>${ops.map(([o, n]) => `${esc(o)} (${n})`).join(", ") || "—"}</div></div>
+    ${fr.slice(0, 5).map((d, i) => `<div class="res" onclick="selectItem('frontier', WORLD.epoch.filter(x=>x.name===${JSON.stringify(d.name).replaceAll('"', "&quot;")})[0])">${esc(d.name)} · ${Math.round(d.mw)} MW</div>`).join("")}
+    ${dcs.slice(0, 12).map((r) => `<div class="res">${esc(r[2])}<div class="meta">${esc(r[3])} · ${esc(r[4])}, ${esc(r[5])}</div></div>`).join("")}
+    ${agentQ(`world_compute(search="${q}")`)}`);
+  zoomTo([...dcs.map((r) => [r[0], r[1]]), ...fr.map((d) => [d.lon, d.lat])].slice(0, 400));
+}
 async function drawWorld() {
   const W = await loadWorld();
+  if (!MAP.length) { try { MAP = await api("/api/map"); } catch (e) {} }
+  renderChips();
   const svg = d3.select("#world"); svg.selectAll("*").remove();
   const proj = d3.geoEqualEarth().fitExtent([[10, 10], [1590, 810]], { type: "Sphere" });
+  PROJ = proj;
   const path = d3.geoPath(proj);
   const tip = $("tip");
   const show = (ev, html) => { tip.innerHTML = html; tip.style.display = "block";
     const r = $("world").getBoundingClientRect(); tip.style.left = (ev.clientX - r.left + 14) + "px"; tip.style.top = (ev.clientY - r.top + 14) + "px"; };
   const hide = () => tip.style.display = "none";
-  svg.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "#fff").attr("stroke", "#0d0d0c").attr("stroke-width", 1);
-  svg.append("path").attr("d", path(d3.geoGraticule10())).attr("fill", "none").attr("stroke", "#eceae4").attr("stroke-width", .6);
-  svg.append("path").attr("d", path(W.land)).attr("fill", "#ecebe6");
-  // undersea cables
-  svg.append("g").selectAll("path").data(W.cables).join("path")
+  const root = svg.append("g");
+  root.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "#fff").attr("stroke", "#0d0d0c").attr("stroke-width", 1).attr("vector-effect", "non-scaling-stroke");
+  root.append("path").attr("d", path(d3.geoGraticule10())).attr("fill", "none").attr("stroke", "#eceae4").attr("stroke-width", .6).attr("vector-effect", "non-scaling-stroke");
+  root.append("path").attr("d", path(W.land)).attr("fill", "#ecebe6");
+  root.append("g").attr("class", "L-cables").selectAll("path").data(W.cables).join("path")
     .attr("d", (c) => path({ type: "MultiLineString", coordinates: c.g[0] && typeof c.g[0][0] === "number" ? [c.g] : c.g }))
-    .attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-opacity", .28).attr("stroke-width", .7);
-  // all facilities
-  svg.append("g").selectAll("circle").data(W.atlas).join("circle")
-    .attr("transform", (d) => `translate(${proj(d)})`).attr("r", 1.1).attr("fill", "#0d0d0c").attr("fill-opacity", .35);
-  // frontier AI datacenters sized by MW
-  const rs = d3.scaleSqrt().domain([0, d3.max(W.epoch, (d) => d.mw) || 1]).range([2, 22]);
-  svg.append("g").selectAll("circle").data(W.epoch).join("circle")
-    .attr("transform", (d) => `translate(${proj([d.lon, d.lat])})`).attr("r", (d) => rs(d.mw))
-    .attr("fill", "#0d0d0c").attr("fill-opacity", .12).attr("stroke", "#0d0d0c").attr("stroke-width", 1)
-    .on("mousemove", (ev, d) => show(ev, `<b>${d.name}</b><br>${d.owner || ""}<br>${Math.round(d.mw)} MW · ${Math.round(d.h100e).toLocaleString()} H100e`)).on("mouseleave", hide);
-  // underwater
-  const u = svg.append("g").selectAll("g").data(W.undersea).join("g").attr("transform", (d) => `translate(${proj([d.lon, d.lat])})`)
-    .on("mousemove", (ev, d) => show(ev, `<b>${d.name}</b><br>${d.status}<br>${d.what}<br><i>location approximate</i>`)).on("mouseleave", hide);
-  u.append("circle").attr("r", 9).attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-width", 2);
+    .attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-opacity", .25).attr("stroke-width", .8).attr("vector-effect", "non-scaling-stroke")
+    .on("mousemove", (ev, c) => show(ev, `<b>${esc(c.n)}</b><br>undersea cable`)).on("mouseleave", hide);
+  root.append("g").attr("class", "L-datacenters").selectAll("circle").data(W.atlas).join("circle").attr("class", "dc pt")
+    .attr("cx", (d) => proj(d)[0]).attr("cy", (d) => proj(d)[1]).attr("r", 1.3).attr("fill", "#0d0d0c").attr("fill-opacity", .35)
+    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d[2])}</b><br>${esc(d[3])} · ${esc(d[4])}, ${esc(d[5])}`)).on("mouseleave", hide)
+    .on("click", (ev, d) => selectItem("dc", d));
+  const rs = d3.scaleSqrt().domain([0, d3.max(W.epoch, (d) => d.mw) || 1]).range([2.5, 22]);
+  root.append("g").attr("class", "L-frontier").selectAll("circle").data(W.epoch).join("circle").attr("class", "pt")
+    .attr("cx", (d) => proj([d.lon, d.lat])[0]).attr("cy", (d) => proj([d.lon, d.lat])[1]).attr("r", (d) => rs(d.mw)).attr("data-r", (d) => rs(d.mw))
+    .attr("fill", "#0d0d0c").attr("fill-opacity", .1).attr("stroke", "#0d0d0c").attr("stroke-width", 1).attr("vector-effect", "non-scaling-stroke")
+    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d.name)}</b><br>${esc(d.owner)} · ${Math.round(d.mw)} MW`)).on("mouseleave", hide)
+    .on("click", (ev, d) => selectItem("frontier", d));
+  const u = root.append("g").attr("class", "L-undersea").selectAll("g").data(W.undersea).join("g").attr("class", "sym")
+    .attr("data-x", (d) => proj([d.lon, d.lat])[0]).attr("data-y", (d) => proj([d.lon, d.lat])[1])
+    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d.name)}</b><br>${esc(d.status)}`)).on("mouseleave", hide).on("click", (ev, d) => selectItem("undersea", d));
+  u.append("circle").attr("r", 9).attr("fill", "#fff").attr("stroke", "#3b6fd8").attr("stroke-width", 2);
   u.append("circle").attr("r", 3).attr("fill", "#3b6fd8");
   u.append("text").text((d) => d.name.split(" (")[0].replace(" data center", "").replace(" underwater", "")).attr("x", 13).attr("y", 4)
     .attr("font-size", 13).attr("font-family", "Inter, sans-serif").attr("fill", "#3b6fd8");
-  // orbit: live positions + ground tracks
-  const og = svg.append("g");
+  const mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
+  const here = proj([-122.399, 37.786]);
+  const ug = root.append("g").attr("class", "L-usable sym").attr("data-x", here[0]).attr("data-y", here[1])
+    .on("mousemove", (ev) => show(ev, `<b>Usable now</b><br>${mine.map((e) => esc(e.name)).join(" + ")}`)).on("mouseleave", hide)
+    .on("click", () => selectItem("usable", mine));
+  ug.append("circle").attr("r", 16).attr("fill", "#2f7d5b").attr("fill-opacity", .18);
+  ug.append("circle").attr("r", 6).attr("fill", "#2f7d5b");
+  ug.append("text").text(`you: ${mine.map((e) => e.name).join(" + ") || "this machine"}`).attr("x", -14).attr("y", -20).attr("text-anchor", "end")
+    .attr("font-size", 15).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#2f7d5b");
+  const og = root.append("g").attr("class", "L-orbit");
+  function placeSyms() {
+    svg.selectAll(".sym").attr("transform", function () { return `translate(${this.dataset.x},${this.dataset.y}) scale(${1 / ZK})`; });
+    svg.selectAll(".dc").attr("r", 1.3 / Math.sqrt(ZK));
+    svg.selectAll(".L-frontier circle").attr("r", function () { return this.dataset.r / Math.sqrt(ZK); });
+  }
   function drawOrbit() {
     og.selectAll("*").remove();
     const now = new Date();
@@ -365,33 +504,32 @@ async function drawWorld() {
         return [satellite.degreesLong(g.longitude), satellite.degreesLat(g.latitude), g.height]; };
       const track = []; for (let m = -45; m <= 45; m += 1) { const p = pos(new Date(+now + m * 60000)); if (p) track.push(p.slice(0, 2)); }
       og.append("path").attr("d", path({ type: "LineString", coordinates: track })).attr("fill", "none")
-        .attr("stroke", "#e8642c").attr("stroke-width", 1.5).attr("stroke-dasharray", "4 4");
+        .attr("stroke", "#e8642c").attr("stroke-width", 1.5).attr("stroke-dasharray", "4 4").attr("vector-effect", "non-scaling-stroke");
       const p = pos(now); if (!p) return;
-      const g = og.append("g").attr("transform", `translate(${proj(p.slice(0, 2))})`)
-        .on("mousemove", (ev) => show(ev, `<b>${o.name}</b> · ${Math.round(p[2])} km up<br>${o.what}<br><span style="opacity:.7">${o.source}, live</span>`)).on("mouseleave", hide);
+      const xy = proj(p.slice(0, 2));
+      const g = og.append("g").attr("class", "sym").attr("data-x", xy[0]).attr("data-y", xy[1]).style("cursor", "pointer")
+        .on("mousemove", (ev) => show(ev, `<b>${esc(o.name)}</b> · ${Math.round(p[2])} km up<br>click for compute windows + downlinks`)).on("mouseleave", hide)
+        .on("click", () => selectItem("sat", o));
+      g.append("circle").attr("r", 14).attr("fill", "#e8642c").attr("fill-opacity", .18);
       g.append("circle").attr("r", 7).attr("fill", "#e8642c");
-      g.append("text").text(o.name).attr("x", 11).attr("y", 4).attr("font-size", 14).attr("font-weight", 500).attr("font-family", "Inter, sans-serif").attr("fill", "#e8642c");
+      g.append("text").text(o.name).attr("x", 12).attr("y", 4).attr("font-size", 14).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#e8642c");
     });
+    placeSyms(); applyVisibility();
   }
-  // tier 1: where YOUR agent can run right now (this event: super{set}, San Francisco)
-  const mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
-  if (mine.length) {
-    const here = proj([-122.399, 37.786]);
-    const g = svg.append("g").attr("transform", `translate(${here})`)
-      .on("mousemove", (ev) => show(ev, `<b>Your agent can run here now</b><br>${mine.map((e) => `${e.name}: ${e.gpu}`).join("<br>")}`)).on("mouseleave", hide);
-    g.append("circle").attr("r", 16).attr("fill", "#2f7d5b").attr("fill-opacity", .18);
-    g.append("circle").attr("r", 6).attr("fill", "#2f7d5b");
-    g.append("text").text(`you: ${mine.map((e) => e.name).join(" + ")}`).attr("x", -14).attr("y", -20).attr("text-anchor", "end")
-      .attr("font-size", 15).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#2f7d5b");
-  }
+  ZOOM = d3.zoom().scaleExtent([1, 14]).translateExtent([[0, 0], [1600, 820]]).on("zoom", (ev) => {
+    root.attr("transform", ev.transform); ZK = ev.transform.k; placeSyms();
+    $("mapstat").textContent = `zoom ${ZK.toFixed(1)}×`;
+  });
+  svg.call(ZOOM);
   drawOrbit(); clearInterval(orbitTimer); orbitTimer = setInterval(() => { if (location.hash === "#map") drawOrbit(); }, 3000);
-  const market = MAP.find((e) => e.kind === "spare-GPU market");
-  $("maplegend").innerHTML = `<div class="idx">(KEY)</div>
-    <div><b style="color:#2f7d5b">● Usable now</b><div class="meta">${mine.map((e) => e.name).join(", ") || "this machine"}: your agent runs jobs here via run_workload</div></div>
-    <div><b>● Rentable</b><div class="meta">${W.atlas.length.toLocaleString()} colocation datacenters (ATLAS) · ${market ? esc(String(market.gpu).split(" (")[0]) : "market GPUs"} on Vast · Modal. Quoted live by quote_job</div></div>
-    <div><b>○ Not reachable yet</b><div class="meta">${W.epoch.length} frontier AI sites sized by MW (Epoch AI) · <span style="color:#3b6fd8">◎ ${W.undersea.length} underwater DCs</span> over ${W.cables.length} undersea cables</div></div>
-    <div><b style="color:#e8642c">● In orbit, live</b><div class="meta">${W.orbit.map((o) => o.name).join(", ")}: real compute in space (CelesTrak + SGP4). Not rentable yet; agents see it in compute_map</div></div>`;
+  applyVisibility();
+  $("mapstat").textContent = "scroll to zoom · drag to pan · click anything";
+  if (!SEL) defaultPanel();
+  const q0 = new URLSearchParams(location.search).get("q");
+  if (q0 && !SEL) { $("msearch").value = q0; doSearch(q0); }
 }
+let searchT = null;
+document.addEventListener("input", (ev) => { if (ev.target.id === "msearch") { clearTimeout(searchT); searchT = setTimeout(() => doSearch(ev.target.value), 220); } });
 
 async function renderOrbit() {
   try {

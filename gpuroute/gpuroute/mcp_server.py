@@ -12,7 +12,8 @@ from .quote import quote
 
 mcp = MCPServer("gpuroute", instructions=(
     "Use gpuroute whenever a task needs GPU or heavy compute: training, fine-tuning, transcription, "
-    "embeddings, image/video generation, rendering, batch inference, and orbital compute (orbital_offers / "
+    "embeddings, image/video generation, rendering, batch inference, and orbital compute. world_compute answers "
+    "questions about where compute physically is (datacenters, frontier AI sites, undersea, orbit) (orbital_offers / "
     "book_orbital). Call compute_map first to see every "
     "machine you can use (including teammates' idle GPUs), use run_workload for arbitrary scripts and "
     "quote_job/launch_job for LoRA fine-tunes. "
@@ -119,6 +120,21 @@ def read_output(job_id: str, filename: str, max_chars: int = 20000) -> dict:
         return {"file": str(f), "bytes": f.stat().st_size, "content": text[:max_chars],
                 "truncated": len(text) > max_chars}
     return {"file": str(f), "bytes": f.stat().st_size, "note": "binary file; use the path"}
+
+
+@mcp.tool()
+def world_compute(layer: str = "all", near: str | None = None, lat: float | None = None, lon: float | None = None,
+                  radius_km: float = 500, search: str | None = None, owner: str | None = None,
+                  country: str | None = None, limit: int = 15) -> dict:
+    """Query the world compute map (the same data as the dashboard's Map tab): where compute physically is.
+    layer: "all" | "datacenters" (6,131 facilities, ATLAS) | "frontier" (frontier AI sites with power in MW
+    and owner, Epoch AI) | "undersea" (underwater datacenters) | "cables" (undersea internet cables) |
+    "orbit" (satellites with compute: live position, sunlight windows, downlink passes).
+    Filter by near (a city like "virginia", "frankfurt", "singapore") or lat/lon + radius_km, by search
+    text, owner/operator, or country. Each layer says whether agents can actually use it: use this for
+    questions like "where is GPU capacity near Frankfurt?", data-residency choices, or "what's in orbit now?"."""
+    from . import world
+    return world.query(layer, near, lat, lon, radius_km, search, owner, country, limit)
 
 
 @mcp.tool()

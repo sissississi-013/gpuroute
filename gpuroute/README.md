@@ -80,6 +80,8 @@ Then ask: *"Fine-tune Qwen/Qwen2.5-0.5B-Instruct on mlabonne/guanaco-llama2-1k, 
 | Tool | What it does |
 |---|---|
 | `compute_map` | Every machine/provider the agent can use and how busy each is right now |
+| `world_compute` | The map as data: datacenters (ATLAS), frontier AI sites (Epoch), undersea cables + underwater DCs, orbital compute (live). Filter by city/lat-lon radius, operator, country, e.g. for data residency |
+| `orbital_offers` / `book_orbital` | Satellite compute marketplace: sunlit GPU windows + ground-station downlink passes from live orbits (mock listings) |
 | `run_workload` | Run any Python script (+ deps, + input files) on the best idle node or this machine |
 | `read_output` | Read a finished job's text outputs |
 | `estimate_job` | VRAM needed (weights/optimizer, activations, overhead) and estimated time on each GPU |
