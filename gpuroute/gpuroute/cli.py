@@ -1,0 +1,248 @@
+"""gpuroute CLI: the human side. Agents use the MCP server; people use this to
+see quotes, watch jobs, approve spending and read the audit log."""
+import argparse
+import json
+import sys
+import time
+
+from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
+
+from . import data, jobs, ledger
+from .estimate import estimate
+from .quote import quote
+
+con = Console()
+STATE_STYLE = {"running": "yellow", "completed": "green", "stopped_at_budget": "magenta",
+               "failed": "red", "cancelled": "dim", "denied": "red", "pending_approval": "cyan"}
+
+
+def money(x):
+    return "$0" if not x else (f"${x:.4f}" if x < 0.01 else f"${x:.2f}")
+
+
+def mins(m):
+    return f"{m:.0f} min" if m < 120 else f"{m / 60:.1f} h"
+
+
+def job_args(p, launch=False):
+    p.add_argument("model", help="Hugging Face model id, e.g. Qwen/Qwen2.5-0.5B-Instruct")
+    if launch:
+        p.add_argument("dataset", help="HF dataset id with a 'text' column, or a local .jsonl path")
+        p.add_argument("--budget", type=float, required=True, help="max $ this job may cost")
+        p.add_argument("--provider", default="auto", choices=["auto", "local", "modal"])
+        p.add_argument("--gpu")
+        p.add_argument("--max-minutes", type=float)
+    else:
+        p.add_argument("--method", default="lora", choices=["lora", "qlora", "full"])
+        p.add_argument("--budget", type=float)
+        p.add_argument("--params-b", type=float, help="model size in billions, for unknown models")
+    p.add_argument("--examples", type=int, default=1000)
+    p.add_argument("--seq-len", type=int, default=512)
+    p.add_argument("--epochs", type=int, default=1)
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+
+
+def cmd_estimate(a):
+    e = estimate(a.model, a.method, a.examples, a.seq_len, a.epochs, params_b=a.params_b)
+    if a.json:
+        return print(json.dumps(e, indent=2))
+    b = e["vram_breakdown_gb"]
+    con.print(Panel(
+        f"[bold]{e['model']}[/] · {e['method']} · {e['params_b']}B params · {e['tokens']:,} tokens\n"
+        f"VRAM needed: [bold]{e['vram_needed_gb']} GB[/]  (weights+optimizer {b['weights_and_optimizer']} · "
+        f"activations {b['activations']} · overhead {b['overhead']})\n[dim]{e['assumptions']}[/]",
+        title="estimate"))
+    t = Table("GPU", "VRAM", "fits", "est. time")
+    for name, g in sorted(e["per_gpu"].items(), key=lambda kv: kv[1]["est_seconds"]):
+        t.add_row(name, f"{g['vram_gb']:.0f} GB", "[green]yes[/]" if g["fits"] else "[red]no[/]",
+                  mins(g["est_seconds"] / 60))
+    con.print(t)
+
+
+def cmd_quote(a):
+    q = quote(a.model, a.method, a.examples, a.seq_len, a.epochs, params_b=a.params_b, budget_usd=a.budget)
+    if a.json:
+        return print(json.dumps(q, indent=2))
+    e = q["estimate"]
+    con.print(f"\n[bold]{e['model']}[/] · {e['method']} · {e['tokens']:,} tokens · needs "
+              f"[bold]{e['vram_needed_gb']} GB[/] VRAM\n")
+    t = Table("#", "where", "GPU", "time", "cost", "you pay", "launch", "notes", show_lines=False)
+    for i, o in enumerate(q["options"][:15], 1):
+        style = "bold green" if o is q["recommended_launch"] else None
+        note = o.get("note") or o.get("needs") or (f"{o['available_now']} available now" if "available_now" in o else "")
+        if a.budget is not None and not o.get("within_budget", True):
+            note = "[red]over budget[/] " + note
+        t.add_row(str(i), o["provider"], o["gpu"], mins(o["est_minutes"]), money(o["cost_usd"]),
+                  money(o["out_of_pocket_usd"]), "[green]✓[/]" if o["launchable"] else "[dim]manual[/]",
+                  note, style=style)
+    con.print(t)
+    if q["recommended_launch"]:
+        r = q["recommended_launch"]
+        con.print(f"[bold green]→ recommended:[/] {r['provider']} {r['gpu']} · {money(r['cost_usd'])} · "
+                  f"{mins(r['est_minutes'])}")
+    for n in q["notes"]:
+        con.print(f"[dim]{n}[/]")
+
+
+def cmd_launch(a):
+    r = jobs.launch(a.model, a.dataset, a.budget, examples=a.examples, seq_len=a.seq_len, epochs=a.epochs,
+                    provider=a.provider, gpu=a.gpu, max_minutes=a.max_minutes, requested_by="human:cli")
+    if a.json:
+        return print(json.dumps(r, indent=2))
+    if not r["ok"]:
+        con.print(f"[red bold]refused:[/] {r['error']}")
+        return 1
+    con.print(f"[green]{r['message']}[/]")
+    con.print(f"[dim]data leaving device: {r['job']['data_leaving_device']}[/]")
+    if r["state"] == "running":
+        con.print(f"watch it:  [bold]gpuroute status {r['job_id']} --watch[/]")
+
+
+def render_job(j):
+    style = STATE_STYLE.get(j["state"], "white")
+    lines = [f"[{style} bold]{j['state']}[/]" + (f"  [dim]{j['phase']}[/]" if j.get("phase") else ""),
+             f"{j['provider']} · {j.get('gpu_name') or j['gpu']} · {j['model']}",
+             f"budget {money(j['budget_usd'])} · est {money(j.get('est_cost_usd'))} · "
+             f"spent {money(j.get('actual_cost_usd', j.get('cost_so_far_usd')))} · "
+             f"GPU time {j.get('gpu_seconds', 0):.0f}s / cap {j.get('hard_timeout_s', 0)}s"]
+    if j.get("progress"):
+        p = j["progress"]
+        filled = int(24 * p["step"] / max(1, p["steps"]))
+        lines.append(f"[{'█' * filled}{'░' * (24 - filled)}] step {p['step']}/{p['steps']} · "
+                     f"loss {p['loss']} · {p['tok_per_s']} tok/s")
+    if j.get("loss_curve") and len(j["loss_curve"]) > 1:
+        lines.append("loss " + spark(j["loss_curve"]))
+    if j.get("artifact") and j["state"] == "completed":
+        lines.append(f"[green]adapter:[/] {j['artifact']}")
+    if j.get("error"):
+        lines.append(f"[red]{j['error']}[/]")
+    lines.append(f"[dim]data leaving device: {j.get('data_leaving_device')}[/]")
+    return Panel("\n".join(lines), title=f"job {j['id']}", expand=False)
+
+
+def spark(vals):
+    blocks = "▁▂▃▄▅▆▇█"
+    lo, hi = min(vals), max(vals)
+    return "".join(blocks[int((v - lo) / (hi - lo or 1) * 7)] for v in vals[-48:]) + f"  {vals[0]} → {vals[-1]}"
+
+
+def cmd_status(a):
+    if a.json:
+        return print(json.dumps(jobs.status(a.job_id), indent=2))
+    if not a.watch:
+        return con.print(render_job(jobs.status(a.job_id)))
+    with Live(render_job(jobs.status(a.job_id)), console=con, refresh_per_second=2) as live:
+        while True:
+            j = jobs.status(a.job_id)
+            live.update(render_job(j))
+            if j["state"] not in ("running", "launching"):
+                break
+            time.sleep(2)
+
+
+def cmd_jobs(a):
+    t = Table("job", "state", "where", "GPU", "model", "budget", "spent")
+    for j in ledger.all_jobs()[:a.limit]:
+        j = jobs.status(j["id"]) if j["state"] == "running" else jobs._public(j)
+        t.add_row(j["id"], f"[{STATE_STYLE.get(j['state'], 'white')}]{j['state']}[/]", j["provider"],
+                  j.get("gpu_name") or j["gpu"], j["model"].split("/")[-1], money(j["budget_usd"]),
+                  money(j.get("actual_cost_usd", j.get("cost_so_far_usd"))))
+    con.print(t)
+
+
+def cmd_cancel(a):
+    con.print(jobs.cancel(a.job_id))
+
+
+def cmd_approve(a, ok=True):
+    r = jobs.approve(a.job_id, ok)
+    if not r["ok"]:
+        con.print(f"[red]{r['error']}[/]")
+        return 1
+    con.print(f"[green]{r.get('message', r['state'])}[/]")
+
+
+def cmd_wallet(a):
+    w = ledger.wallet()
+    if a.json:
+        return print(json.dumps(w, indent=2))
+    used = w["spent_usd"] + w["reserved_usd"]
+    filled = int(30 * used / max(w["allowance_usd"], 1e-9))
+    con.print(Panel(
+        f"[{'█' * min(30, filled)}{'░' * max(0, 30 - filled)}]  {money(used)} of {money(w['allowance_usd'])}\n"
+        f"spent {money(w['spent_usd'])} · reserved by running jobs {money(w['reserved_usd'])} · "
+        f"[bold]available {money(w['available_usd'])}[/]\n"
+        f"approval needed above {money(w['approval_threshold_usd'])} per job · "
+        f"per-job cap {money(w['max_job_usd'])}", title=f"agent allowance · {w['month']}", expand=False))
+
+
+def cmd_policy(a):
+    cfg = ledger.set_config(monthly_allowance_usd=a.allowance, approval_threshold_usd=a.approve_above,
+                            max_job_usd=a.max_job)
+    con.print(cfg)
+
+
+def cmd_log(a):
+    t = Table("time (UTC)", "event", "detail")
+    for e in ledger.entries(a.limit):
+        detail = {k: v for k, v in e.items() if k not in ("ts", "event")}
+        t.add_row(e["ts"][5:19].replace("T", " "), e["event"], json.dumps(detail)[:110])
+    con.print(t)
+
+
+def cmd_free_models(a):
+    models, total, _ = data.free_models(a.limit)
+    t = Table("model", "context")
+    for m in models:
+        t.add_row(m["id"], f"{m['context']:,}")
+    con.print(t)
+    con.print(f"[dim]{total} models at $0/token right now · {data.SOURCES['openrouter']['attribution']}[/]")
+
+
+def cmd_mcp_config(a):
+    import shutil
+    exe = shutil.which("gpuroute-mcp") or f"{sys.prefix}/bin/gpuroute-mcp"
+    print(f"claude mcp add gpuroute -- {exe}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="gpuroute", description="Size, price and launch GPU training jobs "
+                                 "for AI agents, with a hard budget cap.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    job_args(sub.add_parser("estimate", help="VRAM + time per GPU"))
+    job_args(sub.add_parser("quote", help="rank every way to run a job"))
+    job_args(sub.add_parser("launch", help="start a job with a budget"), launch=True)
+    p = sub.add_parser("status", help="job progress and cost")
+    p.add_argument("job_id")
+    p.add_argument("--watch", "-w", action="store_true")
+    p.add_argument("--json", action="store_true")
+    sub.add_parser("jobs", help="recent jobs").add_argument("--limit", type=int, default=15)
+    sub.add_parser("cancel", help="stop a job").add_argument("job_id")
+    sub.add_parser("approve", help="approve a job waiting on you").add_argument("job_id")
+    sub.add_parser("deny", help="deny a job waiting on you").add_argument("job_id")
+    sub.add_parser("wallet", help="agent allowance this month").add_argument("--json", action="store_true")
+    p = sub.add_parser("policy", help="set the agent spending policy")
+    p.add_argument("--allowance", type=float, help="monthly $ cap for agents")
+    p.add_argument("--approve-above", type=float, help="jobs above this $ need your approval")
+    p.add_argument("--max-job", type=float, help="no single job above this $")
+    sub.add_parser("log", help="audit log of every spending decision").add_argument("--limit", type=int, default=25)
+    sub.add_parser("free-models", help="AI models free on OpenRouter right now").add_argument(
+        "--limit", type=int, default=15)
+    sub.add_parser("mcp-config", help="print the command to add gpuroute to Claude Code")
+    p = sub.add_parser("ui", help="open the local dashboard")
+    p.add_argument("--port", type=int, default=7311)
+    p.add_argument("--no-open", action="store_true")
+    a = ap.parse_args()
+    fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
+          "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
+          "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
+          "log": cmd_log, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
+    sys.exit(fn(a) or 0)
+
+
+if __name__ == "__main__":
+    main()

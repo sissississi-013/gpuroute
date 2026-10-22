@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpuroute</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1b1b18; --muted: #6d6b63; --line: #e3e1d9;
+    --accent: #1f5f4a; --accent-soft: #e2efe9; --warn: #a3520f; --warn-soft: #f8ecdf;
+    --bad: #a12a2a; --bad-soft: #f6e3e3; --run: #8a6d00; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121311; --panel: #1b1c1a; --ink: #ecebe6; --muted: #9a988f; --line: #2c2d2a;
+      --accent: #6cc4a1; --accent-soft: #1d3029; --warn: #e3a35f; --warn-soft: #33281c;
+      --bad: #e58b8b; --bad-soft: #3a2222; --run: #e0c35a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 { font: 600 20px/1 var(--mono); letter-spacing: -0.02em; margin: 0; }
+  h1 span { color: var(--muted); font-weight: 400; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .stat .v { font: 600 22px/1.2 var(--mono); }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 14px; display: flex; }
+  .bar i { display: block; height: 100%; }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; }
+  tr.rec td { background: var(--accent-soft); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font: 500 12px/1.6 var(--mono); }
+  .s-running { background: var(--warn-soft); color: var(--run); }
+  .s-completed { background: var(--accent-soft); color: var(--accent); }
+  .s-failed, .s-denied { background: var(--bad-soft); color: var(--bad); }
+  .s-stopped_at_budget { background: var(--warn-soft); color: var(--warn); }
+  .s-pending_approval { background: var(--warn-soft); color: var(--warn); }
+  .s-cancelled { background: var(--line); color: var(--muted); }
+  .job { display: grid; grid-template-columns: 1fr 220px; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .job:last-child { border-bottom: 0; }
+  .job .meta { color: var(--muted); font-size: 13px; }
+  .prog { height: 6px; background: var(--line); border-radius: 3px; margin: 8px 0 4px; overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--accent); }
+  .approval { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; padding: 14px 16px;
+              display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  button { font: 500 13px/1 inherit; padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
+           background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  button.danger { color: var(--bad); }
+  form { display: grid; grid-template-columns: 2fr repeat(5, 1fr) auto; gap: 8px; align-items: end; }
+  label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  input, select { font: 13px var(--mono); padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px;
+                  background: var(--bg); color: var(--ink); width: 100%; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 6px; }
+  .log td { font: 12px var(--mono); }
+  .scroll { overflow-x: auto; }
+  svg.spark { width: 220px; height: 54px; }
+  @media (max-width: 760px) {
+    form { grid-template-columns: 1fr 1fr; }
+    .job { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>gpuroute <span>/ agent compute allowance</span></h1>
+    <span class="muted" id="updated"></span>
+  </header>
+
+  <h2>Allowance</h2>
+  <div class="panel">
+    <div class="grid" id="wallet"></div>
+    <div class="bar" id="walletbar"></div>
+  </div>
+
+  <div id="approvals"></div>
+
+  <h2>Jobs</h2>
+  <div class="panel" id="jobs"><span class="muted">No jobs yet.</span></div>
+
+  <h2>Quote a job</h2>
+  <div class="panel">
+    <form id="qform">
+      <label>model<input name="model" value="Qwen/Qwen2.5-0.5B-Instruct"></label>
+      <label>method<select name="method"><option>lora</option><option>qlora</option><option>full</option></select></label>
+      <label>rows<input name="examples" value="2000" type="number"></label>
+      <label>seq len<input name="seq_len" value="512" type="number"></label>
+      <label>epochs<input name="epochs" value="1" type="number"></label>
+      <label>budget $<input name="budget" value="1" step="0.1" type="number"></label>
+      <button class="primary">Quote</button>
+    </form>
+    <div id="qerr" class="err"></div>
+    <div id="qsummary" class="muted" style="margin-top:12px"></div>
+    <div class="scroll"><table id="qtable"></table></div>
+    <div id="qnotes" class="muted" style="font-size:12px;margin-top:8px"></div>
+  </div>
+
+  <h2>Audit log</h2>
+  <div class="panel scroll"><table class="log" id="log"></table></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = (x) => !x ? "$0" : x < 0.01 ? "$" + x.toFixed(4) : "$" + x.toFixed(2);
+const mins = (m) => m < 120 ? Math.round(m) + " min" : (m / 60).toFixed(1) + " h";
+
+function spark(vals) {
+  if (!vals || vals.length < 2) return "";
+  const w = 220, h = 54, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * (w - 8) + 4},${h - 6 - ((v - lo) / span) * (h - 16)}`);
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${pts.join(" ")}"/>
+    <text x="4" y="10" font-size="10" fill="var(--muted)" font-family="ui-monospace,monospace">loss ${vals[0]} → ${vals[vals.length-1]}</text></svg>`;
+}
+
+async function act(kind, id) {
+  const r = await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" });
+  const j = await r.json();
+  if (j.ok === false) alertBox(j.error);
+  refresh();
+}
+function alertBox(msg) { $("approvals").insertAdjacentHTML("afterbegin", `<div class="err">${esc(msg)}</div>`); }
+
+function renderWallet(w) {
+  const used = w.spent_usd + w.reserved_usd;
+  $("wallet").innerHTML = [
+    ["available", money(w.available_usd)], ["spent", money(w.spent_usd)],
+    ["reserved by running jobs", money(w.reserved_usd)], ["monthly cap", money(w.allowance_usd)],
+    ["approval above", money(w.approval_threshold_usd)], ["per-job cap", money(w.max_job_usd)],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  const pct = (x) => Math.min(100, (x / w.allowance_usd) * 100);
+  $("walletbar").innerHTML = `<i style="width:${pct(w.spent_usd)}%;background:var(--accent)"></i>` +
+    `<i style="width:${pct(w.reserved_usd)}%;background:var(--warn)"></i>`;
+}
+
+function renderJobs(jobs) {
+  const pending = jobs.filter((j) => j.state === "pending_approval");
+  $("approvals").innerHTML = pending.length ? `<h2>Needs your approval</h2>` + pending.map((j) => `
+    <div class="approval"><div><b>${esc(j.requested_by)}</b> wants to spend up to <b>${money(j.budget_usd)}</b>
+      on ${esc(j.provider)} ${esc(j.gpu)} to fine-tune <span class="mono">${esc(j.model)}</span>
+      <div class="muted">est. ${money(j.est_cost_usd)} · ${mins(j.est_minutes)} · data leaving device: ${esc(j.data_leaving_device)}</div></div>
+      <div><button class="primary" onclick="act('approve','${j.id}')">Approve</button>
+      <button class="danger" onclick="act('deny','${j.id}')">Deny</button></div></div>`).join("") : "";
+  const rest = jobs.filter((j) => j.state !== "pending_approval");
+  if (!rest.length) { $("jobs").innerHTML = `<span class="muted">No jobs yet. Ask your agent to fine-tune something.</span>`; return; }
+  $("jobs").innerHTML = rest.map((j) => {
+    const p = j.progress, spent = j.actual_cost_usd ?? j.cost_so_far_usd ?? 0;
+    return `<div class="job"><div>
+      <div><span class="pill s-${j.state}">${j.state.replaceAll("_", " ")}</span>
+        <span class="mono" style="margin-left:8px">${esc(j.model)}</span> ${j.phase ? `<span class="muted">· ${esc(j.phase)}</span>` : ""}</div>
+      <div class="meta">${esc(j.id)} · ${esc(j.provider)} · ${esc(j.gpu_name || j.gpu)} · by ${esc(j.requested_by)}</div>
+      ${p ? `<div class="prog"><i style="width:${(100 * p.step / p.steps).toFixed(0)}%"></i></div>
+        <div class="meta mono">step ${p.step}/${p.steps} · loss ${p.loss} · ${p.tok_per_s} tok/s</div>` : ""}
+      <div class="meta mono">spent ${money(spent)} of ${money(j.budget_usd)} budget · GPU ${Math.round(j.gpu_seconds || 0)}s / cap ${j.hard_timeout_s}s</div>
+      <div class="meta">data leaving device: ${esc(j.data_leaving_device)}</div>
+      ${j.error ? `<div class="err">${esc(j.error)}</div>` : ""}
+      ${j.state === "completed" && j.artifact ? `<div class="meta mono">adapter → ${esc(j.artifact)}</div>` : ""}
+      ${j.state === "running" ? `<div style="margin-top:8px"><button class="danger" onclick="act('cancel','${j.id}')">Stop job</button></div>` : ""}
+    </div><div>${spark(j.loss_curve)}</div></div>`;
+  }).join("");
+}
+
+function renderLog(log) {
+  $("log").innerHTML = `<tr><th>time (UTC)</th><th>event</th><th>detail</th></tr>` + log.map((e) => {
+    const { ts, event, ...rest } = e;
+    const detail = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  ");
+    return `<tr><td>${esc(ts.slice(5, 19).replace("T", " "))}</td><td>${esc(event)}</td><td>${esc(detail)}</td></tr>`;
+  }).join("");
+}
+
+async function refresh() {
+  try {
+    const s = await (await fetch("/api/state")).json();
+    renderWallet(s.wallet); renderJobs(s.jobs); renderLog(s.log);
+    $("updated").textContent = "live · " + new Date().toLocaleTimeString();
+  } catch (e) { $("updated").textContent = "disconnected"; }
+}
+
+$("qform").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("qerr").textContent = ""; $("qtable").innerHTML = ""; $("qsummary").textContent = "pricing…";
+  const params = new URLSearchParams(new FormData(ev.target));
+  const q = await (await fetch("/api/quote?" + params)).json();
+  if (q.error) { $("qerr").textContent = q.error; $("qsummary").textContent = ""; return; }
+  const e = q.estimate, b = e.vram_breakdown_gb;
+  $("qsummary").innerHTML = `<b>${esc(e.model)}</b> · ${e.method} · ${e.tokens.toLocaleString()} tokens · needs <b>${e.vram_needed_gb} GB</b> VRAM
+    (weights+optimizer ${b.weights_and_optimizer} · activations ${b.activations} · overhead ${b.overhead}) <br><span style="font-size:12px">${esc(e.assumptions)}</span>`;
+  const rec = q.recommended_launch;
+  $("qtable").innerHTML = `<tr><th>where</th><th>GPU</th><th>time</th><th>cost</th><th>you pay</th><th>launch</th><th>notes</th></tr>` +
+    q.options.slice(0, 15).map((o) => {
+      const isRec = rec && o.provider === rec.provider && o.gpu === rec.gpu;
+      const note = o.note || o.needs || (o.available_now ? `${o.available_now} available now` : "");
+      const over = o.within_budget === false ? `<span style="color:var(--bad)">over budget</span> ` : "";
+      return `<tr class="${isRec ? "rec" : ""}"><td>${esc(o.provider)}${isRec ? " ← recommended" : ""}</td><td class="mono">${esc(o.gpu)}</td>
+        <td class="mono">${mins(o.est_minutes)}</td><td class="mono">${money(o.cost_usd)}</td><td class="mono">${money(o.out_of_pocket_usd)}</td>
+        <td>${o.launchable ? "✓" : `<span class="muted">manual</span>`}</td><td class="muted">${over}${esc(note)}</td></tr>`;
+    }).join("");
+  if (!q.options.length) $("qtable").innerHTML = `<tr><td class="muted">Nothing fits.</td></tr>`;
+  $("qnotes").innerHTML = q.notes.map(esc).join("<br>");
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
