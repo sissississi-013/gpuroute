@@ -233,7 +233,7 @@ $("qform").addEventListener("submit", async (ev) => {
       const over = o.within_budget === false ? `<span style="color:var(--bad)">over budget</span> ` : "";
       return `<tr class="${isRec ? "rec" : ""}"><td>${esc(o.provider)}${isRec ? " ← recommended" : ""}</td><td class="mono">${esc(o.gpu)}</td>
         <td class="mono">${mins(o.est_minutes)}</td><td class="mono">${money(o.cost_usd)}</td><td class="mono">${money(o.out_of_pocket_usd)}</td>
-        <td>${o.launchable ? "✓" : `<span class="muted">manual</span>`}</td><td class="muted">${over}${esc(note)}</td></tr>`;
+        <td>${o.launchable ? "✓" : (o.note || "").startsWith("setup") ? `<span style="color:var(--warn)">setup</span>` : `<span class="muted">manual</span>`}</td><td class="muted">${over}${esc(note)}</td></tr>`;
     }).join("");
   if (!q.options.length) $("qtable").innerHTML = `<tr><td class="muted">Nothing fits.</td></tr>`;
   $("qnotes").innerHTML = q.notes.map(esc).join("<br>");

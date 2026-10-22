@@ -76,7 +76,7 @@ def cmd_quote(a):
         if a.budget is not None and not o.get("within_budget", True):
             note = "[red]over budget[/] " + note
         t.add_row(str(i), o["provider"], o["gpu"], mins(o["est_minutes"]), money(o["cost_usd"]),
-                  money(o["out_of_pocket_usd"]), "[green]✓[/]" if o["launchable"] else "[dim]manual[/]",
+                  money(o["out_of_pocket_usd"]), "[green]✓[/]" if o["launchable"] else ("[yellow]setup[/]" if (o.get("note") or "").startswith("setup") else "[dim]manual[/]"),
                   note, style=style)
     con.print(t)
     if q["recommended_launch"]:
