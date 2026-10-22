@@ -54,14 +54,30 @@ Then ask: *"Fine-tune Qwen/Qwen2.5-0.5B-Instruct on mlabonne/guanaco-llama2-1k, 
 | `quote_job` | Every way to run it, ranked by what you actually pay, plus the remaining allowance |
 | `launch_job` | Starts a LoRA fine-tune under a budget; refuses with a reason and cheaper options, or returns `pending_approval` |
 | `job_status` | State, step, loss curve, tokens/s, cost so far, artifact path |
+| `providers_status` | Which providers can launch right now, and what each is blocked on |
+| `connect_provider` | **Self-serve setup.** Installs the client, starts sign-in, probes GPU access with a 5-second test call. If a human step remains (sign-in click, payment method), it opens that exact page in the user's browser and hands back one instruction, then verifies on the next call |
 | `cancel_job`, `list_jobs`, `wallet` | Control and visibility |
 | `free_inference_models` | Models OpenRouter serves at $0 right now: check this before fine-tuning at all |
 
 There is deliberately **no MCP tool to approve jobs or change the policy**. Those are human-only (`gpuroute approve`, `gpuroute policy`, or the dashboard).
 
+### Least-friction setup
+
+The agent sets providers up itself. The human only does what legally has to be theirs:
+
+```
+you:    "Fine-tune Qwen2.5-1.5B on my data on a cloud GPU, budget $1"
+agent:  connect_provider("modal")  → signed in ✓ · GPU probe → needs a payment method
+        → opens modal.com/settings/<you>/usage in your browser
+        "Add a payment method, then tell me. Est. $0.07 on an L4, from Modal's free credits; hard cap $1."
+you:    "done"
+agent:  connect_provider("modal") → GPU ✓ (Tesla T4) → launch_job(...) → job_status(...)
+```
+
 ### Human commands
 
 ```
+gpuroute setup [modal]               # provider readiness / connect one
 gpuroute wallet                      # allowance this month
 gpuroute policy --allowance 20 --approve-above 2 --max-job 5
 gpuroute approve <job> | deny <job>  # jobs over the threshold wait for you
@@ -104,7 +120,7 @@ gpuroute free-models
 
 - Launch adapters: **local** (Apple MPS / CUDA) and **Modal**. Vast, Kaggle and Colab are quoted with how-to steps; launch adapters are next.
 - Launch supports LoRA; estimate/quote also cover QLoRA and full fine-tuning.
-- Modal needs a payment method on the account before it runs GPUs (usage is still covered by the $30/month free credits).
+- Modal needs a payment method on the account before it runs GPUs (usage is still covered by the $30/month free credits); `connect_provider` detects this and walks the user through it.
 
 ## Credits
 

@@ -82,6 +82,9 @@
     <div class="bar" id="walletbar"></div>
   </div>
 
+  <h2>Compute providers</h2>
+  <div class="panel" id="providers"></div>
+
   <div id="approvals"></div>
 
   <h2>Jobs</h2>
@@ -169,6 +172,34 @@ function renderJobs(jobs) {
   }).join("");
 }
 
+const SETUP_URL = { payment_method: (p) => `https://modal.com/settings/${p.workspace}/usage`,
+                    sign_in: () => "https://modal.com/signup" };
+function renderProviders(ps) {
+  $("providers").innerHTML = Object.entries(ps).map(([name, p]) => {
+    const pill = p.ready === true ? `<span class="pill s-completed">ready</span>`
+      : p.ready === false ? `<span class="pill s-pending_approval">needs you</span>` : `<span class="pill s-cancelled">unchecked</span>`;
+    let detail = esc(p.device || p.gpu || p.note || "");
+    let actions = "";
+    if (p.ready === false && p.blocked_on) {
+      const url = SETUP_URL[p.blocked_on] ? SETUP_URL[p.blocked_on](p) : null;
+      detail = p.blocked_on === "payment_method"
+        ? "One step: add a payment method. GPU use still comes out of Modal's $30/mo free credits, and your allowance above caps what agents spend."
+        : p.blocked_on === "sign_in" ? "One step: sign in to Modal." : `blocked on ${esc(p.blocked_on)}`;
+      actions = (url ? `<a href="${url}" target="_blank"><button class="primary">Open Modal</button></a> ` : "") +
+                `<button onclick="connectProvider('${name}', this)">I've done it, verify</button>`;
+    } else if (p.ready === null) {
+      actions = `<button onclick="connectProvider('${name}', this)">Check</button>`;
+    }
+    return `<div class="job" style="grid-template-columns:1fr auto;align-items:center"><div>${pill}
+      <span class="mono" style="margin-left:8px">${esc(name)}</span><div class="meta">${detail}</div></div><div>${actions}</div></div>`;
+  }).join("");
+}
+async function connectProvider(name, btn) {
+  btn.disabled = true; btn.textContent = "checking…";
+  await fetch(`/api/connect?provider=${name}`, { method: "POST" });
+  refresh();
+}
+
 function renderLog(log) {
   $("log").innerHTML = `<tr><th>time (UTC)</th><th>event</th><th>detail</th></tr>` + log.map((e) => {
     const { ts, event, ...rest } = e;
@@ -180,7 +211,7 @@ function renderLog(log) {
 async function refresh() {
   try {
     const s = await (await fetch("/api/state")).json();
-    renderWallet(s.wallet); renderJobs(s.jobs); renderLog(s.log);
+    renderWallet(s.wallet); renderProviders(s.providers); renderJobs(s.jobs); renderLog(s.log);
     $("updated").textContent = "live · " + new Date().toLocaleTimeString();
   } catch (e) { $("updated").textContent = "disconnected"; }
 }

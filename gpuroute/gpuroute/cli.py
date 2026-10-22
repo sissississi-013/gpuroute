@@ -202,6 +202,34 @@ def cmd_free_models(a):
     con.print(f"[dim]{total} models at $0/token right now · {data.SOURCES['openrouter']['attribution']}[/]")
 
 
+def cmd_setup(a):
+    from . import providers
+    if a.provider:
+        with con.status(f"connecting {a.provider}…"):
+            r = providers.connect(a.provider, open_browser=not a.no_open)
+        for step in r.get("done", []):
+            con.print(f"[green]✓[/] {step}")
+        if r.get("ready"):
+            con.print(f"[bold green]{a.provider} is ready.[/]")
+        elif r.get("human_action"):
+            h = r["human_action"]
+            con.print(f"[yellow bold]one step for you:[/] {h['instruction']}")
+            if h.get("url"):
+                con.print(f"  {h['url']}" + ("  [dim](opened in your browser)[/]" if h.get("opened_in_browser") else ""))
+            con.print(f"[dim]then run: gpuroute setup {a.provider}[/]")
+        elif r.get("error"):
+            con.print(f"[red]{r['error']}[/]")
+        return
+    t = Table("provider", "ready", "detail")
+    for name, st in providers.status().items():
+        ready = {True: "[green]yes[/]", False: "[red]no[/]", None: "[dim]unchecked[/]"}[st.get("ready")]
+        detail = st.get("device") or st.get("gpu") or ""
+        if st.get("blocked_on"):
+            detail = f"blocked on {st['blocked_on']}: gpuroute setup {name}"
+        t.add_row(name, ready, detail or st.get("note") or "")
+    con.print(t)
+
+
 def cmd_mcp_config(a):
     import shutil
     exe = shutil.which("gpuroute-mcp") or f"{sys.prefix}/bin/gpuroute-mcp"
@@ -232,6 +260,9 @@ def main():
     sub.add_parser("free-models", help="AI models free on OpenRouter right now").add_argument(
         "--limit", type=int, default=15)
     sub.add_parser("mcp-config", help="print the command to add gpuroute to Claude Code")
+    p = sub.add_parser("setup", help="provider readiness, or connect one: gpuroute setup modal")
+    p.add_argument("provider", nargs="?")
+    p.add_argument("--no-open", action="store_true", help="don't open the browser")
     p = sub.add_parser("ui", help="open the local dashboard")
     p.add_argument("--port", type=int, default=7311)
     p.add_argument("--no-open", action="store_true")
@@ -239,7 +270,7 @@ def main():
     fn = {"estimate": cmd_estimate, "quote": cmd_quote, "launch": cmd_launch, "status": cmd_status,
           "jobs": cmd_jobs, "cancel": cmd_cancel, "approve": cmd_approve,
           "deny": lambda a: cmd_approve(a, False), "wallet": cmd_wallet, "policy": cmd_policy,
-          "log": cmd_log, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
+          "log": cmd_log, "setup": cmd_setup, "free-models": cmd_free_models, "mcp-config": cmd_mcp_config,
           "ui": lambda a: __import__("gpuroute.ui").ui.serve(a.port, not a.no_open)}[a.cmd]
     sys.exit(fn(a) or 0)
 

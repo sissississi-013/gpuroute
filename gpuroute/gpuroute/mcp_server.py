@@ -6,12 +6,14 @@ human-only actions in the CLI (`gpuroute approve`, `gpuroute policy`).
 """
 from mcp.server.mcpserver import MCPServer
 
-from . import data, jobs, ledger
+from . import data, jobs, ledger, providers
 from .estimate import estimate
 from .quote import quote
 
 mcp = MCPServer("gpuroute", instructions=(
     "Use gpuroute whenever a task needs GPU compute for training or fine-tuning. "
+    "If a provider isn't ready, call connect_provider: it does the setup itself and only hands the user "
+    "the one step that needs a human (sign-in or payment method), already opened in their browser. "
     "Always call quote_job before launch_job, pick a budget that covers the estimate, and "
     "prefer $0 options (local machine, free credits). Never assume a job finished: poll "
     "job_status. If a launch returns pending_approval, tell the user the exact approve command."
@@ -64,6 +66,22 @@ def launch_job(model: str, dataset: str, budget_usd: float, examples: int = 1000
     """
     return jobs.launch(model, dataset, budget_usd, examples=examples, seq_len=seq_len, epochs=epochs,
                        provider=provider, gpu=gpu, max_minutes=max_minutes, requested_by="agent:mcp")
+
+
+@mcp.tool()
+def providers_status() -> dict:
+    """Which providers can launch jobs right now (local machine, Modal) and what each is blocked on."""
+    return providers.status()
+
+
+@mcp.tool()
+def connect_provider(provider: str = "modal") -> dict:
+    """Set up a provider so launch_job can use it. Does every automatable step itself: installs the
+    client, starts sign-in, and verifies GPU access with a ~5-second test call (~$0.001 of free credits).
+    If a human step remains (sign-in click or adding a payment method), it opens that exact page in the
+    user's browser and returns human_action with a one-line instruction. Relay it, wait for the user
+    to confirm, then call this again to verify."""
+    return providers.connect(provider)
 
 
 @mcp.tool()

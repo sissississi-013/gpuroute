@@ -26,6 +26,8 @@ def quote(model_id, method="lora", examples=1000, seq_len=512, epochs=1, batch=8
                         "launchable": method == "lora",
                         "note": "runs on this machine: $0, and the data never leaves the device"})
 
+    from .providers import known
+    modal_state = known("modal")
     modal_spent = _modal_spent_this_month()
     for gpu, (_, per_s) in MODAL.items():
         g = est["per_gpu"][gpu]
@@ -36,9 +38,12 @@ def quote(model_id, method="lora", examples=1000, seq_len=512, epochs=1, batch=8
         options.append({"provider": "modal", "gpu": gpu, "est_minutes": round(g["est_seconds"] / 60, 1),
                         "cost_usd": round(cost, 4), "price_per_hour": round(per_s * 3600, 3),
                         "out_of_pocket_usd": round(max(0.0, cost - credits_left), 4),
-                        "launchable": method == "lora", "source": "https://modal.com/pricing",
-                        "note": f"covered by Modal free credits (${credits_left:.2f} left this month)"
-                                if cost <= credits_left else None})
+                        "launchable": method == "lora" and modal_state.get("ready") is not False,
+                        "source": "https://modal.com/pricing",
+                        "note": (f"setup needed ({modal_state.get('blocked_on')}): connect_provider('modal')"
+                                 if modal_state.get("ready") is False else
+                                 f"covered by Modal free credits (${credits_left:.2f} left this month)"
+                                 if cost <= credits_left else None)})
 
     try:
         prices, updated, _ = data.vast_prices()

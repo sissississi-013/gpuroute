@@ -197,10 +197,12 @@ def status(job_id):
     elif not alive:
         lowered = text.lower()
         if "payment method" in lowered:
+            from .providers import _save
+            _save("modal", ready=False, blocked_on="payment_method")
             _settle(job, "failed", gpu_seconds,
                     error="Modal needs a payment method before it will run GPU functions (usage is still "
                           "covered by the $30/mo free credits). Add one at https://modal.com/settings "
-                          "-> Usage and Billing, or relaunch with provider='local'.")
+                          "-> Usage and Billing (or call connect_provider('modal')), or relaunch with provider='local'.")
         elif "timeout" in lowered or "timed out" in lowered:
             _settle(job, "stopped_at_budget", min(gpu_seconds, job["hard_timeout_s"]))
         else:

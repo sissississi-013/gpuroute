@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import data, jobs, ledger
+from . import data, jobs, ledger, providers
 from .quote import quote
 
 PAGE = Path(__file__).parent / "templates" / "ui.html"
@@ -20,7 +20,8 @@ def state():
     js = []
     for j in ledger.all_jobs()[:20]:
         js.append(jobs.status(j["id"]) if j["state"] in ("running", "launching") else jobs._public(j))
-    return {"wallet": ledger.wallet(), "jobs": js, "log": ledger.entries(40)[::-1]}
+    return {"wallet": ledger.wallet(), "jobs": js, "log": ledger.entries(40)[::-1],
+            "providers": providers.status()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -70,6 +71,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(jobs.approve(job_id, False))
             if u.path == "/api/cancel":
                 return self.send(jobs.cancel(job_id))
+            if u.path == "/api/connect":
+                name = parse_qs(u.query).get("provider", ["modal"])[0]
+                return self.send(providers.connect(name, open_browser=False))
         except Exception as e:
             return self.send({"error": str(e)}, code=400)
         self.send({"error": "not found"}, code=404)
