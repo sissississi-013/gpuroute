@@ -41,6 +41,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/":
                 return self.send(PAGE.read_bytes(), "text/html; charset=utf-8")
+            if u.path.startswith("/static/"):
+                f = Path(__file__).parent / "static" / Path(u.path).name
+                if f.exists():
+                    return self.send(f.read_bytes(), "image/jpeg")
             if u.path == "/api/state":
                 return self.send(state())
             if u.path == "/api/quote":

@@ -5,16 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gpuroute</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #f3f2ee; --ink: #0d0d0c; --mute: #8a8880; --line: #d9d7cf; --card: #fbfaf7;
+    --paper: #ffffff; --ink: #0d0d0c; --mute: #8a8880; --line: #d9d7cf; --card: #fbfaf7;
     --go: #2f7d5b; --wait: #c96a1f; --stop: #b33a3a;
-    --sans: "Inter Tight", "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --sans: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --paper: #0f0f0e; --ink: #f1f0ea; --mute: #8f8d85; --line: #2a2a27; --card: #171716; --go: #6cc4a1; --wait: #e3a35f; --stop: #e58b8b; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
@@ -26,29 +23,31 @@
   button:disabled { opacity: .4; cursor: default; }
 
   .bar { position: fixed; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: baseline;
-         padding: 18px 24px; z-index: 10; font-size: 17px; font-weight: 500; }
+         padding: 12px 13px; z-index: 10; font-size: 19px; font-weight: 500; letter-spacing: -0.01em;
+         color: #fff; mix-blend-mode: difference; }
+  .bar .tabs a.on { border-bottom-color: #fff !important; }
+  .dot { background: #fff !important; }
   .bar .tabs a { text-decoration: none; padding-bottom: 2px; }
   .bar .tabs a.on { border-bottom: 1.5px solid var(--ink); }
   .bar .right { display: flex; align-items: center; white-space: pre; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); display: inline-block; margin-left: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--ink); display: inline-block; margin-left: 8px; }
   .dot.live { background: var(--go); }
 
   section.tab { display: none; min-height: 100vh; padding: 88px 24px 48px; }
   section.tab.on { display: block; }
 
-  #overview { position: relative; height: 100vh; min-height: 640px; padding: 0; overflow: hidden; }
-  #field { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: min(50vw, 820px); height: 86vh; }
-  .wordmark { position: absolute; left: -0.03em; right: 0; top: 50%; transform: translateY(-58%);
-              font-size: 21vw; font-weight: 500; letter-spacing: -0.065em; line-height: .8; white-space: nowrap;
+  #overview { position: relative; height: 100vh; min-height: 620px; padding: 0; overflow: hidden; background: #fff; }
+  .hero { position: absolute; left: 25.2%; width: 50.2%; top: 0; height: 86%; object-fit: cover; object-position: 50% 40%; }
+  .hero2 { position: absolute; left: 33.6%; width: 33.4%; top: 86%; height: 14%; object-fit: cover; object-position: 50% 45%; }
+  .hero2-label { position: absolute; left: calc(67% + 6px); top: calc(86% + 6px); font-size: 15px; font-weight: 500; }
+  .wordmark { position: absolute; left: -0.02em; top: 50%; transform: translateY(-50%);
+              font-size: 21.4vw; font-weight: 500; letter-spacing: -0.058em; line-height: 1; white-space: nowrap;
               color: #fff; mix-blend-mode: difference; pointer-events: none; }
   .corner { position: absolute; font-size: 15px; }
-  .blurb { left: 24px; bottom: 24px; width: 360px; color: var(--mute); }
-  .cta { right: 24px; bottom: 24px; font-size: 20px; font-weight: 500; color: var(--mute); text-decoration: none; }
+  .blurb { left: 13px; bottom: 14px; width: 330px; color: #8a8a8a; line-height: 1.33; }
+  .credit { left: calc(67% + 6px); top: calc(86% + 30px); width: 220px; font-size: 10px; color: #b0b0b0; line-height: 1.3; }
+  .cta { right: 13px; bottom: 12px; font-size: 19px; font-weight: 500; color: #8a8a8a; text-decoration: none; }
   .cta:hover { color: var(--ink); }
-  .counters { left: 24px; top: 88px; font-family: var(--mono); font-size: 13px; line-height: 1.9; }
-  .counters b { font-weight: 500; }
-  .legend { right: 24px; top: 88px; font-family: var(--mono); font-size: 13px; line-height: 1.9; text-align: right; color: var(--mute); }
-
   h2.big { font-size: clamp(56px, 9vw, 150px); font-weight: 500; letter-spacing: -0.055em; line-height: .9; margin: 24px 0 40px; }
   h2.big sup { font-size: .22em; letter-spacing: 0; vertical-align: top; font-family: var(--mono); font-weight: 400; color: var(--mute); }
   .lede { max-width: 640px; color: var(--mute); font-size: 18px; margin: -16px 0 40px; }
@@ -91,17 +90,18 @@
 </head>
 <body>
 <nav class="bar">
-  <div><b>gpuroute</b>&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
-  <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank">GitHub</a>, <a href="#compute">Share</a>, <span id="clock" class="mutec"></span><span class="dot" id="livedot"></span></div>
+  <div>gpuroute&nbsp;&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
+  <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank" style="text-decoration:none">GitHub</a>, <a href="#compute" style="text-decoration:none">Share</a>, <a href="#spend" style="text-decoration:none">Spend</a><span class="dot" id="livedot"></span><span id="clock" style="display:none"></span></div>
 </nav>
 
 <section class="tab" id="overview">
-  <canvas id="field" role="img" aria-label="Every GPU your agents can reach: large tiles are your machines, small dots are spare GPUs on the market"></canvas>
+  <img class="hero" src="/static/hero.jpg" alt="Rows of server racks in the CERN computer centre">
+  <img class="hero2" src="/static/gpu.jpg" alt="Close-up of an NVIDIA GPU die">
   <div class="wordmark">gpuroute©</div>
-  <div class="corner counters" id="counters"></div>
-  <div class="corner legend">■ your machines<br>· spare market GPUs<br>tile fill = how busy</div>
-  <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market, and runs any workload there under the owner’s rules and a hard budget.</div>
-  <a class="corner cta" href="#compute">(See your compute)</a>
+  <div class="hero2-label" id="usable2">(02)</div>
+  <div class="corner credit">Photos: CERN Computer Centre, Simon Waldherr, CC BY-SA 4.0 · NVIDIA GPU, Binary Koala, CC BY-SA 2.0 (Wikimedia Commons)</div>
+  <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market.</div>
+  <a class="corner cta" href="#compute">(See Your Compute)</a>
 </section>
 
 <section class="tab" id="compute">
@@ -166,53 +166,16 @@ function route() {
   const t = (location.hash || "#overview").slice(1);
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === t));
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + t));
-  if (t === "overview") drawField();
 }
 addEventListener("hashchange", route);
 function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy", 1200); }
 
-/* the field: every reachable GPU as a mark */
-const PALETTE = ["#e8784a", "#9fd8b8", "#6f63d9"];
-function drawField() {
-  const c = $("field"); if (!c || !c.offsetWidth) return;
-  const dpr = devicePixelRatio || 1, W = c.offsetWidth, H = c.offsetHeight;
-  c.width = W * dpr; c.height = H * dpr;
-  const g = c.getContext("2d"); g.scale(dpr, dpr);
-  g.fillStyle = "#121211"; g.fillRect(0, 0, W, H);
-  const mine = MAP.filter((e) => e.kind === "this machine" || e.kind === "shared node");
-  const market = MAP.find((e) => e.kind === "spare-GPU market");
-  const marketN = market ? parseInt(String(market.gpu)) || 0 : 0;
-  const cols = 44, cell = W / cols, rows = Math.ceil(H / cell);
-  let n = 0;
-  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
-    const lit = n++ < marketN;
-    g.fillStyle = lit ? PALETTE[(r * 7 + k * 3) % 3] : "#20201e";
-    g.globalAlpha = lit ? 0.3 + 0.55 * ((r * 13 + k * 7) % 10) / 10 : 1;
-    g.beginPath(); g.arc(k * cell + cell / 2, r * cell + cell / 2, cell * 0.27, 0, 7); g.fill();
-  }
-  g.globalAlpha = 1;
-  const tile = Math.min((W - 32) / Math.max(mine.length, 2) - 16, H * 0.3);
-  mine.forEach((e, i) => {
-    const x = W / 2 - (mine.length * (tile + 16) - 16) / 2 + i * (tile + 16), y = H * 0.1;
-    const busy = Math.min(1, Math.max(0, (e.utilization?.gpu_util_pct ?? 0) / 100));
-    g.fillStyle = e.available ? PALETTE[1] : e.online === false ? "#444" : PALETTE[0];
-    g.fillRect(x, y, tile, tile);
-    g.fillStyle = "rgba(18,18,17,.82)"; g.fillRect(x, y + tile * (1 - busy), tile, tile * busy);
-    g.fillStyle = "#121211"; g.font = "500 15px 'JetBrains Mono', monospace";
-    g.fillText(e.name, x + 12, y + 24);
-    g.font = "13px 'JetBrains Mono', monospace";
-    g.fillText(e.available ? "idle · usable" : e.online === false ? "offline" : "busy", x + 12, y + 44);
-  });
-}
-addEventListener("resize", drawField);
-
 function renderCounters() {
   const usable = MAP.filter((e) => e.available).length;
-  const shared = MAP.filter((e) => e.kind === "shared node").length;
   const market = MAP.find((e) => e.kind === "spare-GPU market");
-  const w = STATE?.wallet;
-  $("counters").innerHTML = `(01) <b>${usable}</b> usable now<br>(02) <b>${shared}</b> shared machine${shared === 1 ? "" : "s"}<br>` +
-    `(03) <b>${market ? (parseInt(String(market.gpu)) || 0).toLocaleString() : "?"}</b> spare market GPUs<br>(04) <b>${w ? money(w.spent_usd) : "$0"}</b> spent this month`;
+  const spare = market ? (parseInt(String(market.gpu)) || 0).toLocaleString() : "";
+  $("usable2").textContent = `(02)`;
+  $("usable2").title = `${usable} usable now · ${spare} spare market GPUs`;
   $("livedot").classList.toggle("live", usable > 0);
   $("computecount").textContent = `(${MAP.length})`;
 }
@@ -298,7 +261,7 @@ async function refresh() {
   } catch (e) { $("clock").textContent = "offline"; }
 }
 async function refreshMap() {
-  try { MAP = await (await fetch("/api/map")).json(); renderMap(); renderCounters(); drawField(); } catch (e) {}
+  try { MAP = await (await fetch("/api/map")).json(); renderMap(); renderCounters(); } catch (e) {}
 }
 
 $("qform").addEventListener("submit", async (ev) => {
