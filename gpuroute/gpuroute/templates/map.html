@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gpuroute map: where the world’s compute is</title>
+<meta name="description" content="An interactive map of the world’s compute: 6,131 datacenters, frontier AI sites, undersea cables and computers in orbit, and the part of it an AI agent can actually use.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #ffffff; --ink: #0d0d0c; --mute: #77756d; --line: #d9d7cf; --card: #fbfaf7; --land: #ecebe6;
+    --go: #0f7350; --sea: #2f66d6; --orbit: #ee6a2a;
+    --sans: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --bar: 52px; --rail: 408px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font-family: var(--sans); }
+  body { font-size: 14px; line-height: 1.4; -webkit-font-smoothing: antialiased; display: grid; grid-template-rows: var(--bar) minmax(0, 1fr); overflow: hidden; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .mute { color: var(--mute); }
+
+  header { display: flex; align-items: center; gap: 20px; padding: 0 16px; border-bottom: 1px solid var(--ink); }
+  .brand { font-size: 19px; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap; }
+  .brand a { text-decoration: none; }
+  .brand a.on { border-bottom: 1.5px solid var(--ink); padding-bottom: 2px; }
+  .search { position: relative; flex: 1 1 auto; max-width: 480px; }
+  .search input { width: 100%; font: 14px var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--line);
+                  border-radius: 999px; padding: 8px 40px 8px 14px; }
+  .search input:focus { outline: none; border-color: var(--ink); background: var(--paper); }
+  .search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 11px var(--mono); color: var(--mute);
+                border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; pointer-events: none; }
+  .search input:focus + kbd, .search input:not(:placeholder-shown) + kbd { display: none; }
+  .links { margin-left: auto; font-size: 15px; font-weight: 500; white-space: nowrap; }
+  .links a { text-decoration: none; }
+  .links a:hover, .brand a:hover { color: var(--mute); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) var(--rail); min-height: 0; }
+  .left { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+  #stage { position: relative; background: var(--card); min-height: 0; overflow: hidden; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #cv.grabbing { cursor: grabbing; } #cv.point { cursor: pointer; }
+  #chips { position: absolute; left: 12px; right: 260px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #stage.flat #chips { left: 76px; }
+  .chip { font: 500 12px var(--sans); border-radius: 999px; padding: 5px 11px 5px 9px; border: 1px solid var(--line);
+          background: rgba(255,255,255,.92); color: var(--mute); display: inline-flex; gap: 7px; align-items: center; }
+  .chip[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
+  .chip[aria-pressed="false"] .sw { opacity: .3; }
+  .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .sw.ring { background: none !important; border: 1.5px solid var(--ink); }
+  .sw.dash { height: 0; width: 12px; border-radius: 0; border-top: 2px solid; background: none !important; }
+  .sw.sq { border-radius: 2px; }
+  .zoom { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; border: 1px solid var(--ink); border-radius: 10px; overflow: hidden; background: var(--paper); }
+  .zoom button { width: 34px; height: 32px; text-align: center; font-size: 17px; line-height: 1; }
+  .zoom button + button { border-top: 1px solid var(--line); }
+  .zoom button:hover { background: var(--card); }
+  #key { position: absolute; right: 12px; bottom: 12px; width: 236px; display: flex; gap: 8px; align-items: flex-end; pointer-events: none; color: var(--mute); font-size: 11.5px; line-height: 1.35;
+         background: rgba(251,250,247,.9); border-radius: 10px; padding: 8px 10px; }
+  #key b { color: var(--ink); font-weight: 600; } #key svg { flex: none; }
+  #viewseg { position: absolute; left: 12px; top: 12px; background: var(--paper); border-color: var(--ink); }
+  #stage.flat #viewseg { left: 76px; }
+  #tip { position: fixed; pointer-events: none; display: none; background: var(--ink); color: #fff; font-size: 12.5px;
+         padding: 8px 10px; border-radius: 7px; max-width: 280px; line-height: 1.4; z-index: 20; }
+  #tip b { font-weight: 600; } #tip .t2 { color: #c9c7bf; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mute); }
+
+  #strip { border-top: 1px solid var(--ink); padding: 10px 16px 8px; background: var(--paper); }
+  .striphead { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 2px; }
+  .striphead h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .key { display: inline-flex; align-items: center; gap: 6px; color: var(--mute); font-size: 12px; }
+  .key i { display: inline-block; width: 16px; border-radius: 3px; }
+  #clock { margin-left: auto; color: var(--mute); }
+  #orbitsvg { width: 100%; display: block; }
+  #orbitsvg .hit { cursor: pointer; }
+
+  #rail { border-left: 1px solid var(--ink); overflow-y: auto; padding: 22px 22px 28px; min-height: 0; }
+  #rail h1 { font-size: 40px; font-weight: 500; letter-spacing: -0.045em; line-height: .98; margin: 0 0 14px; }
+  #rail h1 sup { font: 400 11px var(--mono); letter-spacing: 0; color: var(--mute); vertical-align: top; margin-left: 4px; }
+  #rail h3 { font-size: 26px; font-weight: 500; letter-spacing: -0.035em; line-height: 1.05; margin: 4px 0 10px; }
+  .lede { color: var(--mute); font-size: 14.5px; margin: 0 0 20px; max-width: 46ch; }
+  .sec { margin-top: 26px; }
+  .sech { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .sech h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .sech .note { color: var(--mute); font-size: 12px; }
+  .access { width: 100%; border-collapse: collapse; }
+  .access td:first-child { white-space: nowrap; }
+  .access td { padding: 8px 0; border-top: 1px solid var(--line); vertical-align: baseline; }
+  .access tr:last-child td { border-bottom: 1px solid var(--line); }
+  .access td:nth-child(2) { font-variant-numeric: tabular-nums; text-align: right; padding: 0 14px 0 8px; white-space: nowrap; }
+  .access td:last-child { color: var(--mute); font-size: 13px; }
+  .access .sw { margin-right: 8px; }
+  .access .yes { color: var(--go); font-weight: 600; }
+  .bars { display: grid; gap: 1px; }
+  .barrow { display: grid; grid-template-columns: 118px minmax(0, 1fr) 58px; gap: 10px; align-items: center; width: 100%; padding: 4px 0; border-radius: 4px; }
+  .barrow:hover .lab, .barrow.on .lab { text-decoration: underline; text-underline-offset: 3px; }
+  .barrow .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barrow .trk { height: 10px; }
+  .barrow .trk i { display: block; height: 100%; min-width: 2px; background: var(--ink); border-radius: 0 4px 4px 0; }
+  .barrow.dim .trk i { background: #c9c7bf; }
+  .barrow .val { font: 12px var(--mono); color: var(--mute); text-align: right; white-space: nowrap; }
+  .share { display: flex; gap: 2px; height: 22px; } .share i { display: block; min-width: 3px; border-radius: 3px; }
+  .sharekey { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 13px; color: var(--mute); } .sharekey b { color: var(--ink); font-weight: 600; } .sharekey .sw { margin-right: 6px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+  .seg button { font-size: 12px; padding: 3px 10px; border-radius: 999px; color: var(--mute); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .back { font-size: 13px; color: var(--mute); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; margin-bottom: 16px; }
+  .back:hover { color: var(--ink); border-color: var(--ink); }
+  .tag { font: 12px var(--mono); color: var(--mute); }
+  .kv { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 7px 12px; margin: 14px 0; }
+  .kv > :nth-child(odd) { color: var(--mute); }
+  .res { display: block; width: 100%; padding: 8px 0; border-top: 1px solid var(--line); }
+  .res:hover b { text-decoration: underline; text-underline-offset: 3px; }
+  .res b { font-weight: 500; } .res .mute { font-size: 13px; }
+  .agentq { background: var(--ink); color: #f1f0ea; border-radius: 10px; padding: 12px; font: 12px/1.5 var(--mono); margin-top: 8px; word-break: break-word; }
+  .src { color: var(--mute); font-size: 12px; margin-top: 28px; line-height: 1.5; }
+  .stripplot { width: 100%; display: block; margin-top: 4px; }
+
+  @media (max-width: 980px) {
+    html, body { height: auto; } body { display: block; overflow: auto; }
+    header { height: var(--bar); position: sticky; top: 0; background: var(--paper); z-index: 5; gap: 12px; }
+    .links .hide-s, .search kbd { display: none; }
+    main { display: block; } #stage { height: 62vh; min-height: 380px; }
+    #rail { border-left: 0; border-top: 1px solid var(--ink); overflow: visible; }
+    #chips, #stage.flat #chips { left: 10px; right: 10px; } #key { display: none; } #stage.flat #viewseg { left: 12px; }
+  }
+  @media (max-width: 560px) { .brand .sub { display: none; } #rail h1 { font-size: 34px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><a href="./">gpuroute</a>&nbsp;&nbsp;<span class="sub">(<a href="./">Dashboard</a>/<a class="on" href="map.html" aria-current="page">Map</a>)</span></div>
+  <div class="search"><input id="q" type="search" placeholder="Search datacenters, operators, cities" autocomplete="off" aria-label="Search the map"><kbd>/</kbd></div>
+  <div class="links"><a class="hide-s" href="./#start">Get started</a><span class="hide-s">, </span><a href="https://github.com/sissississi-013/gpuroute" target="_blank" rel="noopener">GitHub</a></div>
+</header>
+<main>
+  <div class="left">
+    <div id="stage">
+      <canvas id="cv" role="img" aria-label="World map of compute: datacenters, frontier AI sites, undersea cables, underwater datacenters, satellites and the machines an agent can use now. The side panel lists the same data as text."></canvas>
+      <div id="loading">Loading 6,131 datacenters…</div>
+      <div id="chips" role="group" aria-label="Map layers"></div>
+      <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset" aria-label="Reset view" style="font-size:13px">⟲</button></div>
+      <div id="key"></div>
+      <div class="seg" id="viewseg" role="group" aria-label="Map view"><button data-view="globe" aria-pressed="true">Globe</button><button data-view="flat" aria-pressed="false">Flat</button></div>
+    </div>
+    <section id="strip" aria-label="Orbital compute timeline">
+      <div class="striphead">
+        <h2>In orbit, next 6 hours</h2>
+        <span class="key"><i style="height:10px;background:var(--orbit)"></i>compute window</span>
+        <span class="key"><i style="height:5px;background:var(--ink)"></i>downlink pass over a ground station</span>
+        <span class="mono" id="clock"></span>
+      </div>
+      <svg id="orbitsvg" height="110"></svg>
+    </section>
+  </div>
+  <aside id="rail" aria-live="polite"></aside>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const C = { ink: "#0d0d0c", mute: "#77756d", line: "#d9d7cf", land: "#ecebe6", sea: "#2f66d6", orbit: "#ee6a2a", go: "#0f7350", paper: "#ffffff", card: "#fbfaf7" };
+const num = (n) => Math.round(n).toLocaleString("en-US");
+const power = (mw) => !mw ? "no power listed" : mw >= 1000 ? (mw / 1000).toFixed(mw >= 10000 ? 0 : 1) + " GW" : Math.round(mw) + " MW";
+const hhmm = (t) => new Date(t).toISOString().slice(11, 16);
+const STATIC = !["127.0.0.1", "localhost"].includes(location.hostname);
+const getJSON = (u) => fetch(u).then((r) => { if (!r.ok) throw new Error(u); return r.json(); });
+const api = (name) => getJSON(STATIC ? `snapshot/${name}.json` : `/api/${name}`);
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const HERE = [-122.399, 37.786]; // where the pool's machines are drawn (San Francisco)
+
+const LAYERS = [
+  { id: "usable", label: "Usable now", color: C.go, sw: "" },
+  { id: "orbit", label: "Orbit, live", color: C.orbit, sw: "" },
+  { id: "frontier", label: "Frontier AI sites", color: C.ink, sw: "ring" },
+  { id: "datacenters", label: "Datacenters", color: C.mute, sw: "" },
+  { id: "undersea", label: "Underwater", color: C.sea, sw: "ring" },
+  { id: "cables", label: "Undersea cables", color: C.sea, sw: "dash" },
+  { id: "night", label: "Night side", color: "#d5d3cc", sw: "sq" },
+].map((l) => ({ ...l, on: true }));
+const on = (id) => LAYERS.find((l) => l.id === id).on;
+
+let D = null, G = {}, W = 0, H = 0, DPR = 1, proj = null;
+let filter = null, sel = null, hover = null, band = null, chartMode = "country";
+let SKY = { sats: [], bands: [], sun: null };
+const cv = $("cv"), ctx = cv.getContext("2d"), tip = $("tip");
+
+/* ---------- astronomy: same model as gpuroute/orbital.py ---------- */
+const R_EARTH = 6378.137, RAD = Math.PI / 180;
+const jd = (t) => +t / 86400000 + 2440587.5;
+const gmst = (j) => (((280.46061837 + 360.98564736629 * (j - 2451545.0)) % 360) + 360) % 360 * RAD;
+function sunDir(j) {
+  const n = j - 2451545.0, L = ((280.460 + 0.9856474 * n) % 360) * RAD, g = ((357.528 + 0.9856003 * n) % 360) * RAD;
+  const lam = L + 1.915 * RAD * Math.sin(g) + 0.020 * RAD * Math.sin(2 * g), eps = (23.439 - 0.0000004 * n) * RAD;
+  return [Math.cos(lam), Math.cos(eps) * Math.sin(lam), Math.sin(eps) * Math.sin(lam)];
+}
+function subsolar(t) {
+  const j = jd(t), s = sunDir(j);
+  let lon = (Math.atan2(s[1], s[0]) - gmst(j)) / RAD; lon = ((lon + 540) % 360) - 180;
+  return [lon, Math.asin(s[2]) / RAD];
+}
+function satState(rec, t) {
+  const pv = satellite.propagate(rec, new Date(t)); if (!pv.position) return null;
+  const r = pv.position, j = jd(t), s = sunDir(j), dot = r.x * s[0] + r.y * s[1] + r.z * s[2], r2 = r.x * r.x + r.y * r.y + r.z * r.z;
+  const th = gmst(j), x = r.x * Math.cos(th) + r.y * Math.sin(th), y = -r.x * Math.sin(th) + r.y * Math.cos(th);
+  return { ecef: [x, y, r.z], sunlit: dot > 0 || Math.sqrt(Math.max(0, r2 - dot * dot)) > R_EARTH, alt: Math.sqrt(r2) - R_EARTH,
+           lat: Math.atan2(r.z, Math.hypot(x, y)) / RAD, lon: Math.atan2(y, x) / RAD };
+}
+function elevation(st, e) {
+  const la = st.lat * RAD, lo = st.lon * RAD, up = [Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)];
+  const d = [e[0] - R_EARTH * up[0], e[1] - R_EARTH * up[1], e[2] - R_EARTH * up[2]];
+  return Math.asin((d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) / Math.hypot(...d)) / RAD;
+}
+/* Sunlit windows and ground-station passes for one satellite, then the same offers orbital_offers() lists. */
+function timeline(sat, now, hours = 6) {
+  const STEP = 30000, end = now + hours * 3600000, sun = [], passes = [], open = {};
+  let curSun = null;
+  for (let t = now; t <= end; t += STEP) {
+    const s = satState(sat.rec, t); if (!s) continue;
+    if (s.sunlit && curSun === null) curSun = t;
+    else if (!s.sunlit && curSun !== null) { sun.push([curSun, t]); curSun = null; }
+    for (const st of D.market.stations) {
+      const e = elevation(st, s.ecef), p = open[st.name];
+      if (e >= D.market.min_elev) { if (!p) open[st.name] = { st, start: t, max: e }; else p.max = Math.max(p.max, e); }
+      else if (p) { passes.push({ ...p, end: t }); delete open[st.name]; }
+    }
+  }
+  if (curSun !== null) sun.push([curSun, end]);
+  passes.sort((a, b) => a.start - b.start);
+  const op = sat.op, id = sat.name.toLowerCase(), compute = [], relay = [];
+  (op.needs_sun ? sun : [[now, end]]).slice(0, 4).forEach(([a, b], i) => {
+    const mins = (b - a) / 60000; if (mins < 3) return;
+    const nxt = passes.find((p) => p.start >= a);
+    compute.push({ id: `${id}-c${i}`, a, b, mins: Math.round(mins), openNow: a <= now, price: op.usd_per_gpu_min, hardware: op.hardware,
+                   power: op.needs_sun ? "solar, sunlit" : "station power", downlink: nxt ? `${nxt.st.name} at ${hhmm(nxt.start)}` : "none in window" });
+  });
+  passes.forEach((p, j) => relay.push({ id: j < 6 ? `${id}-r${j}` : null, a: p.start, b: p.end, station: p.st.name, max: Math.round(p.max),
+                                        gb: +(p.st.mbps * (p.end - p.start) / 1000 / 8 / 1000).toFixed(1), price: p.st.usd_per_gb }));
+  return { sun, compute, relay };
+}
+
+/* ---------- data ---------- */
+async function load() {
+  const [land, atlas, cables, epoch, undersea, orbit, market, map] = await Promise.all([
+    getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"), getJSON("static/geo/atlas.json"), getJSON("static/geo/cables.json"),
+    getJSON("static/geo/epoch.json"), getJSON("static/geo/undersea.json"), getJSON("static/geo/orbit.json"),
+    api("market").catch(() => ({ operators: [], stations: [], min_elev: 10 })), api("map").catch(() => [])]);
+  cables.forEach((c) => { c.geo = { type: "MultiLineString", coordinates: c.g[0] && typeof c.g[0][0] === "number" ? [c.g] : c.g }; });
+  epoch.sort((a, b) => b.mw - a.mw);
+  const sats = orbit.map((o) => ({ ...o, rec: satellite.twoline2satrec(o.tle[1], o.tle[2]),
+    op: market.operators.find((p) => p.sat === o.name) || { needs_sun: true, hardware: o.what, usd_per_gpu_min: null } }));
+  const bins = d3.range(-90, 90, 5).map((lat0) => ({ lat0, lat1: lat0 + 5, n: 0, m: 0 }));
+  atlas.forEach((r) => { const b = bins[Math.min(35, Math.floor((r[1] + 90) / 5))]; if (b) b.n++; });
+  const mine = (Array.isArray(map) ? map : []).filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
+  D = { land: topojson.feature(land, land.objects.land), atlas, cables, epoch, undersea, sats, market, bins, mine,
+        maxMW: d3.max(epoch, (d) => d.mw) || 1, totalMW: d3.sum(epoch, (d) => d.mw), totalH100: d3.sum(epoch, (d) => d.h100e) };
+  const n = atlas.length; D.ux = new Float32Array(n); D.uy = new Float32Array(n); D.uz = new Float32Array(n);
+  atlas.forEach((r, i) => { const u = U(r[0], r[1]); D.ux[i] = u[0]; D.uy[i] = u[1]; D.uz[i] = u[2]; });
+  [...epoch, ...undersea, ...market.stations].forEach((d) => { d.u = U(d.lon, d.lat); });
+  D.here = { lon: HERE[0], lat: HERE[1], u: U(HERE[0], HERE[1]) };
+  D.cablesGeo = { type: "MultiLineString", coordinates: cables.flatMap((c) => c.geo.coordinates) };
+  const sl = [], sa = [], sc = [];  // points along every cable, for hover
+  cables.forEach((c, ci) => c.geo.coordinates.forEach((ln) => { for (let i = 1; i < ln.length; i++) {
+    const m = Math.max(1, Math.ceil(d3.geoDistance(ln[i - 1], ln[i]) / 0.012)), f = d3.geoInterpolate(ln[i - 1], ln[i]);
+    for (let j = 0; j <= m; j++) { const q = f(j / m); sl.push(q[0]); sa.push(q[1]); sc.push(ci); } } }));
+  D.cs = { n: sl.length, lon: sl, lat: sa, ci: sc, ux: new Float32Array(sl.length), uy: new Float32Array(sl.length), uz: new Float32Array(sl.length) };
+  sl.forEach((lo, i) => { const u = U(lo, sa[i]); D.cs.ux[i] = u[0]; D.cs.uy[i] = u[1]; D.cs.uz[i] = u[2]; });
+  D.frByCountry = d3.rollups(epoch, (v) => d3.sum(v, (d) => d.mw), (d) => d.country).sort((a, b) => b[1] - a[1]);
+  D.byOwner = d3.rollups(epoch, (v) => ({ mw: d3.sum(v, (d) => d.mw), n: v.length }), (d) => d.owner).sort((a, b) => b[1].mw - a[1].mw);
+  D.byCountry = d3.rollups(atlas, (v) => v.length, (r) => r[5] || "Unknown").sort((a, b) => b[1] - a[1]);
+  D.byOperator = d3.rollups(atlas.filter((r) => r[3]), (v) => v.length, (r) => r[3]).sort((a, b) => b[1] - a[1]);
+}
+
+/* ---------- view + geometry ---------- */
+const U = (lon, lat) => { const a = lon * RAD, b = lat * RAD, c = Math.cos(b); return [c * Math.cos(a), c * Math.sin(a), Math.sin(b)]; };
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const HOME = [58, -28], SPHERE = { type: "Sphere" }, GRAT = d3.geoGraticule10();
+const V = { mode: new URLSearchParams(location.search).get("view") === "flat" ? "flat" : "globe", rot: [...HOME], k: 1, tx: 0, ty: 0 };
+let projBase = null, M = null, spin = !REDUCED, anim = null, syncing = false, lastT = d3.zoomIdentity, lastTs = 0;
+const projF = d3.geoEqualEarth(), projG = d3.geoOrthographic().clipAngle(90).precision(.4);
+let SX, SY, VIS;
+
+function rebuild() {
+  const st = $("stage"); W = st.clientWidth; H = st.clientHeight; DPR = Math.min(devicePixelRatio || 1, 2);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  st.classList.toggle("flat", V.mode === "flat");
+  G.gut = V.mode === "flat" && W >= 640 ? 64 : 0;
+  G.cx = W / 2; G.cy = H / 2 - 12; G.R0 = Math.max(70, Math.min(W * .45, (H - 44) * .455));
+  projBase = d3.geoEqualEarth().fitExtent([[G.gut + 14, 16], [W - 14, H - 58]], SPHERE);
+  G.s0 = projBase.scale(); G.c0 = projBase.translate();
+  const n = D.atlas.length; G.bx = new Float32Array(n); G.by = new Float32Array(n); SX = new Float32Array(n); SY = new Float32Array(n); VIS = new Uint8Array(n);
+  D.atlas.forEach((r, i) => { const p = projBase(r); G.bx[i] = p[0]; G.by[i] = p[1]; });
+  [...D.epoch, ...D.undersea, ...D.market.stations, D.here].forEach((d) => { d.b = projBase([d.lon, d.lat]); });
+  const cs = D.cs; cs.bx = new Float32Array(cs.n); cs.by = new Float32Array(cs.n);
+  for (let i = 0; i < cs.n; i++) { const p = projBase([cs.lon[i], cs.lat[i]]); cs.bx[i] = p[0]; cs.by[i] = p[1]; }
+  D.bins.forEach((b) => { b.y0 = projBase([0, b.lat1])[1]; b.y1 = projBase([0, b.lat0])[1]; });
+  zoom.extent([[0, 0], [W, H]]).translateExtent(V.mode === "flat" ? [[0, 0], [W, H]] : [[-Infinity, -Infinity], [Infinity, Infinity]]);
+  V.k = 1; V.tx = 0; V.ty = 0; sync(); hover = null; band = null;
+  updateSky(); drawKey(); drawStrip();
+}
+function frame() {
+  const k = V.k;
+  if (V.mode === "globe") {
+    const l = V.rot[0] * RAD, p = V.rot[1] * RAD;
+    M = { cl: Math.cos(l), sl: Math.sin(l), cp: Math.cos(p), sp: Math.sin(p), R: G.R0 * k };
+    proj = projG.scale(M.R).translate([G.cx, G.cy]).rotate([V.rot[0], V.rot[1]]);
+  } else proj = projF.scale(G.s0 * k).translate([G.c0[0] * k + V.tx, G.c0[1] * k + V.ty]);
+}
+/* screen position of a unit vector lifted h Earth radii: [x, y, 1 in front | 2 behind the globe but past its edge | 0 hidden] */
+function lift(u, h) {
+  const x1 = u[0] * M.cl - u[1] * M.sl, y1 = u[0] * M.sl + u[1] * M.cl, X = x1 * M.cp - u[2] * M.sp, Z = u[2] * M.cp + x1 * M.sp, m = M.R * (1 + h);
+  const dx = m * y1, dy = m * Z;
+  return [G.cx + dx, G.cy - dy, X > 0 ? 1 : h > 0 && dx * dx + dy * dy > M.R * M.R ? 2 : 0];
+}
+const S = (d, h = 0) => V.mode === "globe" ? lift(d.u, h) : [d.b[0] * V.k + V.tx, d.b[1] * V.k + V.ty, 1];
+const P = (lon, lat, h = 0) => { if (V.mode === "globe") return lift(U(lon, lat), h); const p = projBase([lon, lat]); return [p[0] * V.k + V.tx, p[1] * V.k + V.ty, 1]; };
+const isNight = (u) => on("night") && dot3(u, SKY.sun) < -0.105; // sun more than 6° below the horizon
+
+/* ---------- sky: night side, satellite tracks, timelines (every 30 s) ---------- */
+function updateSky() {
+  const now = Date.now(), sub = subsolar(now), anti = [sub[0] + 180, -sub[1]];
+  SKY.sun = U(sub[0], sub[1]);
+  SKY.anti = anti; SKY.bandsN = 0; SKY.night = d3.geoCircle().center(anti).radius(90)();
+  SKY.dn = new Float32Array(D.atlas.length);
+  for (let i = 0; i < SKY.dn.length; i++) SKY.dn[i] = D.ux[i] * SKY.sun[0] + D.uy[i] * SKY.sun[1] + D.uz[i] * SKY.sun[2];
+  SKY.sats = D.sats.map((sat) => {
+    const track = [];
+    for (let t = now - 12 * 60000; t <= now + 96 * 60000; t += 30000) {
+      const s = satState(sat.rec, t); if (s) track.push({ u: U(s.lon, s.lat), lon: s.lon, lat: s.lat, h: s.alt / R_EARTH, key: t < now ? 0 : s.sunlit ? 1 : 2 });
+    }
+    return { sat, track, tl: timeline(sat, now), built: now };
+  });
+  tick();
+}
+function tick() {
+  const now = Date.now();
+  SKY.sats.forEach((s) => {
+    s.now = satState(s.sat.rec, now); if (!s.now) return;
+    s.u = U(s.now.lon, s.now.lat); s.h = s.now.alt / R_EARTH;
+    s.links = D.market.stations.filter((st) => elevation(st, s.now.ecef) >= D.market.min_elev);
+  });
+  $("clock").textContent = new Date(now).toISOString().slice(11, 19) + " UTC";
+  if (!spin || V.mode !== "globe") render();
+}
+
+/* ---------- render ---------- */
+function label(text, x, y, opts = {}) {
+  ctx.font = `${opts.weight || 500} ${opts.size || 12}px Inter, sans-serif`; ctx.textAlign = opts.align || "left"; ctx.textBaseline = "middle";
+  ctx.lineWidth = 3.5; ctx.lineJoin = "round"; ctx.strokeStyle = opts.night ? "rgba(13,13,12,.8)" : "rgba(255,255,255,.92)"; ctx.strokeText(text, x, y);
+  ctx.fillStyle = opts.night ? "#fff" : C.ink; ctx.fillText(text, x, y);
+}
+const TRACK = [{ a: .3, w: 1.2 }, { a: 1, w: 1.9 }, { a: .65, w: 1.3, dash: [3, 4] }];
+function render() {
+  if (!D || !W || !SKY.sun) return; frame();
+  const k = V.k, sk = Math.sqrt(k), globe = V.mode === "globe", night = on("night"), gp = d3.geoPath(proj, ctx);
+  const draw = (geo) => { ctx.beginPath(); gp(geo); };
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H); ctx.lineJoin = "round"; ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  /* the Earth: day first, then the night side laid over it */
+  draw(SPHERE); ctx.fillStyle = C.paper; ctx.fill();
+  draw(GRAT); ctx.lineWidth = .6; ctx.strokeStyle = "#efede8"; ctx.stroke();
+  draw(D.land); ctx.fillStyle = C.land; ctx.fill();
+  if (on("cables")) { draw(D.cablesGeo); ctx.lineWidth = .7; ctx.strokeStyle = `rgba(47,102,214,${Math.min(.6, .3 + .04 * k)})`; ctx.stroke(); }
+  if (night) {
+    const nb = Math.min(72, Math.round(16 * Math.min(4.5, Math.sqrt(k))));  // finer twilight steps as you zoom in
+    if (nb !== SKY.bandsN) { SKY.bandsN = nb; SKY.bands = d3.range(nb).map((i) => d3.geoCircle().center(SKY.anti).radius(90 - 18 * i / nb).precision(3)()); }
+    ctx.fillStyle = `rgba(13,13,12,${(1 - Math.pow(.15, 1 / nb)).toFixed(4)})`;
+    SKY.bands.forEach((b) => { draw(b); ctx.fill(); });
+    ctx.save(); draw(SKY.night); ctx.clip();
+    draw(D.land); ctx.fillStyle = "rgba(255,255,255,.08)"; ctx.fill();
+    if (on("cables")) { draw(D.cablesGeo); ctx.lineWidth = .7; ctx.strokeStyle = `rgba(140,172,255,${Math.min(.7, .26 + .05 * k)})`; ctx.stroke(); }
+    ctx.restore();
+  }
+  const hc = hover && hover.kind === "cable" ? hover.d : sel && sel.kind === "cable" ? sel.d : null;
+  if (hc && on("cables")) { draw(hc.geo); ctx.lineWidth = 4.5; ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.stroke(); ctx.lineWidth = 2; ctx.strokeStyle = C.sea; ctx.stroke(); }
+  draw(SPHERE); ctx.lineWidth = 1; ctx.strokeStyle = C.ink; ctx.stroke();
+
+  /* datacenters: ink by day, lit windows by night */
+  const r0 = Math.min(4.5, 1.15 * sk), n = D.atlas.length, F = filter && filter.dc, showDc = on("datacenters");
+  {
+    const ux = D.ux, uy = D.uy, uz = D.uz, dn = SKY.dn, tx = V.tx, ty = V.ty, aDay = Math.min(.8, .42 + .05 * k);
+    const cl = M && M.cl, sl = M && M.sl, cp = M && M.cp, sp = M && M.sp, R = M && M.R, glow = [];
+    let last = -1;
+    for (let i = 0; i < n; i++) {
+      let x, y;
+      if (globe) { const x1 = ux[i] * cl - uy[i] * sl; if (x1 * cp - uz[i] * sp <= 0) { VIS[i] = 0; continue; } x = G.cx + R * (ux[i] * sl + uy[i] * cl); y = G.cy - R * (uz[i] * cp + x1 * sp); }
+      else { x = G.bx[i] * k + tx; y = G.by[i] * k + ty; }
+      SX[i] = x; SY[i] = y;
+      if (x < G.gut - 5 || x > W + 5 || y < -5 || y > H + 5) { VIS[i] = 0; continue; }
+      VIS[i] = 1; if (!showDc) continue;
+      const nt = night && dn[i] < -0.105, st = (F ? (F[i] ? 4 : 2) : 0) + (nt ? 1 : 0);
+      if (st !== last) { last = st; ctx.fillStyle = nt ? (st === 5 ? "#fff" : "#ffd27a") : C.ink; ctx.globalAlpha = [aDay, .95, .07, .13, .95, 1][st]; }
+      const r = st >= 4 ? r0 * 1.35 : r0;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+      if (nt && st !== 3) glow.push(x, y, r);
+    }
+    ctx.fillStyle = "#ffd27a"; ctx.globalAlpha = .11;
+    for (let i = 0; i < glow.length; i += 3) { ctx.beginPath(); ctx.arc(glow[i], glow[i + 1], Math.min(7, glow[i + 2] * 2.4), 0, 6.2832); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+
+  /* frontier AI sites: spike height is power */
+  const Hmax = Math.min(H * .2, 110) * Math.min(sk, 2.6);
+  D.epoch.forEach((d) => { const p = S(d); d.sx = p[0]; d.sy = p[1]; d.vis = p[2]; d.hpx = Math.max(5, Hmax * d.mw / D.maxMW); });
+  if (on("frontier")) {
+    const vis = D.epoch.filter((d) => d.vis).sort((a, b) => a.sy - b.sy), boxes = [];
+    vis.forEach((d) => {
+      const nt = isNight(d.u), dim = filter && !filter.fr.has(d);
+      ctx.globalAlpha = dim ? .16 : 1;
+      ctx.beginPath(); ctx.moveTo(d.sx - 3.4, d.sy); ctx.lineTo(d.sx, d.sy - d.hpx); ctx.lineTo(d.sx + 3.4, d.sy); ctx.closePath();
+      ctx.fillStyle = nt ? "rgba(255,255,255,.28)" : "rgba(13,13,12,.16)"; ctx.fill();
+      ctx.lineWidth = 1.1; ctx.strokeStyle = nt ? "#fff" : C.ink; ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    if (k >= 2.2 || filter) [...vis].sort((a, b) => b.mw - a.mw).forEach((d) => {
+      if (filter && !filter.fr.has(d)) return; if (!filter && boxes.length > 14) return;
+      ctx.font = "500 12px Inter, sans-serif"; const w = ctx.measureText(d.name).width, y = d.sy - d.hpx - 9, b = [d.sx - w / 2, y - 8, d.sx + w / 2, y + 8];
+      if (boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1])) return;
+      boxes.push(b); label(d.name, d.sx, y, { align: "center", night: isNight(d.u) });
+    });
+  }
+
+  if (on("undersea")) D.undersea.forEach((d) => {
+    const p = S(d); d.sx = p[0]; d.sy = p[1]; d.vis = p[2]; if (!d.vis) return;
+    ctx.beginPath(); ctx.arc(d.sx, d.sy, 7, 0, 6.2832); ctx.fillStyle = C.paper; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.sea; ctx.stroke();
+    ctx.beginPath(); ctx.arc(d.sx, d.sy, 2.5, 0, 6.2832); ctx.fillStyle = C.sea; ctx.fill();
+    label(d.short, d.sx + 12, d.sy, { night: isNight(d.u) });
+  });
+
+  /* orbit: tracks at true altitude, ground stations, satellites */
+  if (on("orbit")) {
+    D.market.stations.forEach((st) => {
+      const p = S(st); st.sx = p[0]; st.sy = p[1]; st.vis = p[2]; if (!st.vis) return;
+      ctx.fillStyle = C.paper; ctx.fillRect(st.sx - 3.5, st.sy - 3.5, 7, 7); ctx.lineWidth = 1.5; ctx.strokeStyle = C.orbit; ctx.strokeRect(st.sx - 3.5, st.sy - 3.5, 7, 7);
+      if (k >= 2.5 || (hover && hover.d === st)) label(st.name, st.sx + 9, st.sy, { size: 11, night: isNight(st.u) });
+    });
+    ctx.strokeStyle = C.orbit;
+    SKY.sats.forEach((s) => {
+      let style = null, px = 0, py = 0, open = false;
+      const flush = () => { if (open) ctx.stroke(); open = false; };
+      s.track.forEach((q) => {
+        const p = globe ? lift(q.u, q.h) : P(q.lon, q.lat), id = p[2] ? q.key * 3 + p[2] : null;
+        const jump = !globe && open && Math.abs(p[0] - px) > W * k * .3;
+        if (id === null) { flush(); style = null; return; }
+        if (id !== style || jump) {
+          const carry = open && !jump; flush(); style = id;
+          const t = TRACK[q.key]; ctx.globalAlpha = t.a * (p[2] === 2 ? .38 : 1); ctx.lineWidth = t.w; ctx.setLineDash(t.dash || []);
+          ctx.beginPath(); if (carry) { ctx.moveTo(px, py); ctx.lineTo(p[0], p[1]); } else ctx.moveTo(p[0], p[1]); open = true;
+        } else ctx.lineTo(p[0], p[1]);
+        px = p[0]; py = p[1];
+      });
+      flush(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    });
+    SKY.sats.forEach((s) => {
+      if (!s.now) { s.vis = 0; return; }
+      const p = globe ? lift(s.u, s.h) : P(s.now.lon, s.now.lat), g = globe ? lift(s.u, 0) : null;
+      s.sx = p[0]; s.sy = p[1]; s.vis = p[2]; if (!s.vis) return;
+      ctx.globalAlpha = s.vis === 2 ? .45 : 1;
+      if (g && g[2] === 1) { ctx.beginPath(); ctx.moveTo(g[0], g[1]); ctx.lineTo(s.sx, s.sy); ctx.lineWidth = 1; ctx.strokeStyle = C.orbit; ctx.stroke(); ctx.beginPath(); ctx.arc(g[0], g[1], 2, 0, 6.2832); ctx.fillStyle = C.orbit; ctx.fill(); }
+      (s.links || []).forEach((st) => { if (!st.vis) return; ctx.beginPath(); ctx.moveTo(s.sx, s.sy); ctx.lineTo(st.sx, st.sy); ctx.lineWidth = 1.2; ctx.strokeStyle = C.orbit; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); });
+      ctx.beginPath(); ctx.arc(s.sx, s.sy, 12, 0, 6.2832); ctx.fillStyle = "rgba(238,106,42,.22)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(s.sx, s.sy, 5.5, 0, 6.2832); ctx.fillStyle = s.now.sunlit ? C.orbit : C.paper; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.orbit; ctx.stroke();
+      const inDisc = globe && Math.hypot(s.sx - G.cx, s.sy - G.cy) < M.R;
+      label(s.sat.name, s.sx + 16, s.sy, { weight: 600, size: 13, night: (inDisc || !globe) && isNight(s.u) });
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  { const p = S(D.here); D.here.sx = p[0]; D.here.sy = p[1]; D.here.vis = on("usable") ? p[2] : 0;
+    if (D.here.vis) { const x = p[0], y = p[1], nt = isNight(D.here.u);
+      ctx.beginPath(); ctx.arc(x, y, 14, 0, 6.2832); ctx.fillStyle = "rgba(15,115,80,.25)"; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.2832); ctx.fillStyle = C.go; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = C.paper; ctx.stroke();
+      ctx.font = "600 13px Inter, sans-serif"; const fits = x - 14 - ctx.measureText(usableLabel()).width > G.gut + 4;
+      label(usableLabel(), fits ? x - 14 : x + 14, y - 17, { weight: 600, size: 13, align: fits ? "right" : "left", night: nt }); } }
+
+  const ring = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.lineWidth = 4.5; ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.stroke(); ctx.lineWidth = 2; ctx.strokeStyle = C.ink; ctx.stroke(); };
+  [sel, hover].forEach((h) => {
+    if (!h) return;
+    if (h.kind === "dc" && VIS[h.i]) ring(SX[h.i], SY[h.i], r0 + 4);
+    if (h.kind === "frontier" && h.d.vis) { ring(h.d.sx, h.d.sy, 7); if (k < 2.2 && !filter) label(h.d.name, h.d.sx, h.d.sy - h.d.hpx - 9, { align: "center", night: isNight(h.d.u) }); }
+    if (h.kind === "undersea" && h.d.vis) ring(h.d.sx, h.d.sy, 11);
+    if (h.kind === "sat") { const s = SKY.sats.find((q) => q.sat === h.d); if (s && s.vis) ring(s.sx, s.sy, 15); }
+    if (h.kind === "usable" && D.here.vis) ring(D.here.sx, D.here.sy, 17);
+  });
+
+  /* flat view only: latitude histogram, aligned with the map */
+  if (G.gut) {
+    const Y = (y) => y * k + V.ty;
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, G.gut, H);
+    const max = d3.max(D.bins, (b) => b.n), bw = G.gut - 34;
+    if (band) { const a = Y(band.y0), b = Y(band.y1); ctx.fillStyle = "rgba(13,13,12,.07)"; ctx.fillRect(G.gut, a, W - G.gut, b - a); }
+    D.bins.forEach((b) => {
+      if (!b.n) return; const a = Y(b.y0), z = Y(b.y1), h = Math.max(1, z - a - 1.5);
+      ctx.fillStyle = filter ? "#e2e0d9" : b === band ? C.ink : "#a3a199"; ctx.fillRect(32, a + .75, Math.max(1, bw * b.n / max), h);
+      if (filter && b.m) { ctx.fillStyle = C.ink; ctx.fillRect(32, a + .75, Math.max(1, bw * b.m / max), h); }
+    });
+    ctx.font = "10px 'JetBrains Mono', monospace"; ctx.fillStyle = C.mute; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    [60, 30, 0, -30, -60].forEach((la) => { const y = Y(projBase([0, la])[1]); if (y > 8 && y < H - 8) ctx.fillText(la === 0 ? "0°" : Math.abs(la) + "°" + (la > 0 ? "N" : "S"), 27, y); });
+    ctx.fillStyle = C.ink; ctx.fillRect(G.gut - 1, 0, 1, H);
+  }
+}
+const usableLabel = () => D.mine.length ? "your agent: " + D.mine.map((e) => e.name).join(" + ") : "your agent runs here";
+
+/* ---------- picking ---------- */
+function pick(mx, my) {
+  if (G.gut && mx < G.gut) return null;
+  const k = V.k, near = (d, r) => d.vis && Math.hypot(d.sx - mx, d.sy - my) <= r;
+  if (on("orbit")) { for (const s of SKY.sats) if (near(s, 15)) return { kind: "sat", d: s.sat }; }
+  if (near(D.here, 15)) return { kind: "usable" };
+  if (on("undersea")) { for (const d of D.undersea) if (near(d, 11)) return { kind: "undersea", d }; }
+  if (on("orbit")) { for (const d of D.market.stations) if (near(d, 8)) return { kind: "station", d }; }
+  let dc = null;
+  if (on("datacenters")) {
+    let best = Math.max(30, (Math.min(4.5, 1.15 * Math.sqrt(k)) + 3) ** 2), bi = -1;
+    for (let i = 0; i < VIS.length; i++) { if (!VIS[i]) continue; const dx = SX[i] - mx, dy = SY[i] - my, q = dx * dx + dy * dy; if (q < best && !(filter && !filter.dc[i] && k < 4)) { best = q; bi = i; } }
+    if (bi >= 0) dc = { kind: "dc", i: bi, d: D.atlas[bi], q: best };
+  }
+  if (on("frontier")) {
+    let best = null, bq = 49;
+    D.epoch.forEach((d) => { if (!d.vis || (filter && !filter.fr.has(d))) return;
+      const t = Math.max(0, Math.min(1, (d.sy - my) / d.hpx)), dx = d.sx - mx, dy = d.sy - t * d.hpx - my, q = dx * dx + dy * dy; if (q < bq) { bq = q; best = d; } });
+    if (best && (!dc || bq <= dc.q || k < 3)) return { kind: "frontier", d: best };
+  }
+  if (dc) return dc;
+  if (on("cables")) {
+    const cs = D.cs, globe = V.mode === "globe"; let bq = 30, bi = -1;
+    for (let i = 0; i < cs.n; i++) {
+      let x, y;
+      if (globe) { const x1 = cs.ux[i] * M.cl - cs.uy[i] * M.sl; if (x1 * M.cp - cs.uz[i] * M.sp <= 0) continue; x = G.cx + M.R * (cs.ux[i] * M.sl + cs.uy[i] * M.cl); y = G.cy - M.R * (cs.uz[i] * M.cp + x1 * M.sp); }
+      else { x = cs.bx[i] * k + V.tx; y = cs.by[i] * k + V.ty; }
+      const dx = x - mx, dy = y - my, q = dx * dx + dy * dy; if (q < bq) { bq = q; bi = i; }
+    }
+    if (bi >= 0) return { kind: "cable", d: D.cables[cs.ci[bi]] };
+  }
+  return null;
+}
+const tipHTML = (h) => {
+  if (h.kind === "dc") return `<b>${esc(h.d[2])}</b><br><span class="t2">${esc([h.d[3], [h.d[4], h.d[5]].filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</span>`;
+  if (h.kind === "frontier") return `<b>${esc(h.d.name)}</b><br><span class="t2">${esc(h.d.owner)} · ${power(h.d.mw)} · ${num(h.d.h100e)} H100-eq</span>`;
+  if (h.kind === "undersea") return `<b>${esc(h.d.name)}</b><br><span class="t2">${esc(h.d.status)}</span>`;
+  if (h.kind === "cable") return `<b>${esc(h.d.n)}</b><br><span class="t2">undersea cable</span>`;
+  if (h.kind === "station") return `<b>${esc(h.d.name)}</b><br><span class="t2">ground station · ${h.d.mbps} Mbps downlink</span>`;
+  if (h.kind === "usable") return `<b>Usable now</b><br><span class="t2">${esc(D.mine.map((e) => e.name).join(" + ") || "the machine running gpuroute")}</span>`;
+  if (h.kind === "sat") { const s = SKY.sats.find((q) => q.sat === h.d); return `<b>${esc(h.d.name)}</b><br><span class="t2">${Math.round(s.now.alt)} km up · ${s.now.sunlit ? "sunlit" : "in Earth’s shadow"}<br>click for compute windows</span>`; }
+};
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.min(innerWidth - r.width - 8, ev.clientX + 14) + "px";
+  tip.style.top = (ev.clientY + 16 + r.height > innerHeight ? ev.clientY - r.height - 10 : ev.clientY + 16) + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+cv.addEventListener("mousemove", (ev) => {
+  if (!D || ev.buttons) return; const b = cv.getBoundingClientRect(), mx = ev.clientX - b.left, my = ev.clientY - b.top;
+  let nb = null, nh = null;
+  if (G.gut && mx < G.gut) {
+    nb = D.bins.find((q) => q.n && my >= q.y0 * V.k + V.ty && my < q.y1 * V.k + V.ty) || null;
+    if (nb) { const f = (la) => la === 0 ? "0°" : Math.abs(la) + "°" + (la > 0 ? "N" : "S");
+      showTip(`<b>${f(nb.lat0)} to ${f(nb.lat1)}</b><br><span class="t2">${num(nb.n)} datacenters · ${(100 * nb.n / D.atlas.length).toFixed(1)}% of the world’s${filter ? `<br>${num(nb.m)} match “${esc(filter.label)}”` : ""}</span>`, ev); } else hideTip();
+  } else { nh = pick(mx, my); if (nh) showTip(tipHTML(nh), ev); else hideTip(); }
+  cv.classList.toggle("point", !!nh);
+  const same = (a, c) => (!a && !c) || (a && c && a.kind === c.kind && a.d === c.d && a.i === c.i);
+  if (nb !== band || !same(nh, hover)) { band = nb; hover = nh; render(); }
+});
+cv.addEventListener("mouseleave", () => { hideTip(); hover = null; band = null; render(); });
+let downAt = null;
+cv.addEventListener("pointerdown", (ev) => { downAt = [ev.clientX, ev.clientY]; });
+cv.addEventListener("click", (ev) => {
+  if (!D || (downAt && Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5)) return;
+  const b = cv.getBoundingClientRect(), h = pick(ev.clientX - b.left, ev.clientY - b.top);
+  if (h && h.kind !== "station") select(h, false); else if (sel) { sel = null; renderRail(); render(); }
+});
+
+/* ---------- moving the view ---------- */
+function stopSpin() { spin = false; if (anim) { cancelAnimationFrame(anim); anim = null; } }
+function loop(ts) {
+  if (!spin || V.mode !== "globe") { lastTs = 0; return; }
+  if (lastTs && !document.hidden) V.rot[0] += Math.min(100, ts - lastTs) * 0.0022;
+  lastTs = ts; render(); requestAnimationFrame(loop);
+}
+function sync() {
+  syncing = true; d3.select(cv).call(zoom.transform, d3.zoomIdentity.translate(V.tx, V.ty).scale(V.k)); lastT = d3.zoomTransform(cv); syncing = false;
+  if (V.mode === "flat") { V.tx = lastT.x; V.ty = lastT.y; }
+}
+const zoom = d3.zoom().scaleExtent([1, 40]).on("start", () => cv.classList.add("grabbing")).on("end", () => cv.classList.remove("grabbing"))
+  .on("zoom", (ev) => {
+    if (syncing) return; stopSpin(); const t = ev.transform;
+    if (V.mode === "flat") { V.k = t.k; V.tx = t.x; V.ty = t.y; }
+    else if (t.k !== lastT.k) V.k = t.k;
+    else { const s = 180 / Math.PI / (G.R0 * V.k); V.rot[0] += (t.x - lastT.x) * s; V.rot[1] = Math.max(-85, Math.min(85, V.rot[1] - (t.y - lastT.y) * s)); }
+    lastT = t; hideTip(); render();
+  });
+function animateTo(to, ms = 750) {
+  stopSpin();
+  const from = { rot: [...V.rot], k: V.k, tx: V.tx, ty: V.ty }, t0 = performance.now();
+  to = { rot: from.rot, tx: from.tx, ty: from.ty, k: from.k, ...to };
+  const dl = ((to.rot[0] - from.rot[0]) % 360 + 540) % 360 - 180;
+  const step = (now) => {
+    const u = REDUCED ? 1 : Math.min(1, (now - t0) / ms), e = d3.easeCubicInOut(u);
+    V.rot = [from.rot[0] + dl * e, from.rot[1] + (to.rot[1] - from.rot[1]) * e]; V.k = from.k * Math.pow(to.k / from.k, e);
+    V.tx = from.tx + (to.tx - from.tx) * e; V.ty = from.ty + (to.ty - from.ty) * e;
+    sync(); render(); anim = u < 1 ? requestAnimationFrame(step) : null;
+  };
+  anim = requestAnimationFrame(step);
+}
+function flyTo(pts, minK = 1, maxK = 12) {
+  if (!pts.length) return;
+  if (V.mode === "globe") {
+    const c = d3.geoCentroid({ type: "MultiPoint", coordinates: pts }), ds = pts.map((p) => d3.geoDistance(p, c)).sort(d3.ascending);
+    const dmax = Math.min(1.45, d3.quantile(ds, pts.length > 40 ? .97 : 1)), k = Math.max(minK, Math.min(maxK, .85 / Math.sin(Math.max(dmax, .02))));
+    return animateTo({ rot: [-c[0], Math.max(-80, Math.min(80, -c[1]))], k });
+  }
+  const xy = pts.map((p) => projBase(p)), q = (acc, p) => d3.quantile(xy.map(acc).sort(d3.ascending), p), trim = xy.length > 40 ? .03 : 0;
+  const x0 = q((d) => d[0], trim), x1 = q((d) => d[0], 1 - trim), y0 = q((d) => d[1], trim), y1 = q((d) => d[1], 1 - trim);
+  const k = Math.max(minK, Math.min(maxK, .8 / Math.max((x1 - x0 + 30) / (W - G.gut), (y1 - y0 + 30) / H)));
+  animateTo({ k, tx: (W + G.gut) / 2 - k * (x0 + x1) / 2, ty: H / 2 - k * (y0 + y1) / 2 });
+}
+function zoomBy(f) {
+  const k = Math.max(1, Math.min(40, V.k * f)), g = k / V.k;
+  animateTo(V.mode === "flat" ? { k, tx: W / 2 - (W / 2 - V.tx) * g, ty: H / 2 - (H / 2 - V.ty) * g } : { k }, 350);
+}
+const resetView = () => animateTo({ rot: [...HOME], k: 1, tx: 0, ty: 0 });
+$("zin").onclick = () => zoomBy(1.8);
+$("zout").onclick = () => zoomBy(1 / 1.8);
+$("zreset").onclick = resetView;
+function setMode(m) {
+  if (m === V.mode) return; stopSpin(); V.mode = m; V.rot = [...HOME];
+  document.querySelectorAll("#viewseg button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === m));
+  const u = new URL(location); if (m === "flat") u.searchParams.set("view", "flat"); else u.searchParams.delete("view"); history.replaceState(null, "", u);
+  rebuild(); if (filter) setFilter(filter);
+}
+$("viewseg").addEventListener("click", (ev) => { const b = ev.target.closest("[data-view]"); if (b) setMode(b.dataset.view); });
+
+/* ---------- filter + selection ---------- */
+function setFilter(f, fly = true) {
+  D.bins.forEach((b) => { b.m = 0; });
+  if (!f) { filter = null; } else {
+    const dc = new Uint8Array(D.atlas.length), has = (s) => (s || "").toLowerCase().includes(f.value), pts = [];
+    const dcTest = f.type === "search" ? (r) => has(r[2]) || has(r[3]) || has(r[4]) || has(r[5]) : f.type === "country" ? (r) => (r[5] || "Unknown") === f.value
+      : f.type === "operator" ? (r) => r[3] === f.value : () => false;
+    const frTest = f.type === "search" ? (d) => has(d.name) || has(d.owner) || has(d.country) : f.type === "country" ? (d) => d.country === f.value
+      : f.type === "owner" ? (d) => d.owner === f.value : () => false;
+    const rows = [];
+    D.atlas.forEach((r, i) => { if (dcTest(r)) { dc[i] = 1; rows.push(i); pts.push(r); D.bins[Math.min(35, Math.floor((r[1] + 90) / 5))].m++; } });
+    const fr = new Set(D.epoch.filter(frTest)); fr.forEach((d) => pts.push([d.lon, d.lat]));
+    filter = { ...f, dc, rows, fr };
+    if (fly && pts.length) flyTo(pts.map((q) => [q[0], q[1]]));
+  }
+  const u = new URL(location); if (filter && filter.type === "search") u.searchParams.set("q", filter.value); else u.searchParams.delete("q");
+  history.replaceState(null, "", u);
+  if (!filter || filter.type !== "search") $("q").value = "";
+  sel = null; renderRail(); render();
+}
+function select(h, fly = true) {
+  sel = h; renderRail(); render();
+  if (!fly) return;
+  const p = h.kind === "dc" ? h.d : h.kind === "frontier" || h.kind === "undersea" ? [h.d.lon, h.d.lat] : null;
+  if (h.kind === "sat" && V.mode === "globe") { const q = SKY.sats.find((x) => x.sat === h.d); if (q && q.now) animateTo({ rot: [-q.now.lon, Math.max(-60, Math.min(60, -q.now.lat * .7))], k: Math.min(V.k, 1.6) }); }
+  if (p) { const kk = Math.max(V.k, V.mode === "globe" ? 3.2 : 7); flyTo([[p[0], p[1]]], kk, kk); }
+}
+
+/* ---------- side panel ---------- */
+const agentQ = (call) => `<div class="sec"><div class="tag">your agent asks</div><div class="agentq">${esc(call)}</div></div>`;
+const sw = (id) => { const l = LAYERS.find((x) => x.id === id); return `<span class="sw ${l.sw}" style="background:${l.color};border-color:${l.color}"></span>`; };
+function barRows(rows, max, attr) {
+  return `<div class="bars">${rows.map(([name, v, val, title]) => `<button class="barrow${filter && filter.value === name ? " on" : ""}${name == null ? " dim" : ""}" ${name == null ? "disabled" : `data-${attr}="${esc(name)}"`} title="${esc(title || "")}">
+    <span class="lab">${esc(name ?? title)}</span><span class="trk"><i style="width:${(100 * v / max).toFixed(2)}%"></i></span><span class="val">${val}</span></button>`).join("")}</div>`;
+}
+function ownerChart() {
+  const top = D.byOwner.slice(0, 8), rest = D.byOwner.slice(8), rows = top.map(([o, v]) => [o, v.mw, power(v.mw), `${v.n} site${v.n > 1 ? "s" : ""}`]);
+  if (rest.length) rows.push([null, d3.sum(rest, (d) => d[1].mw), power(d3.sum(rest, (d) => d[1].mw)), `${rest.length} other owners`]);
+  return barRows(rows, d3.max(rows, (r) => r[1]), "owner");
+}
+function placeChart() {
+  const src = chartMode === "country" ? D.byCountry : D.byOperator, rows = src.slice(0, 10).map(([n, v]) => [n, v, num(v)]);
+  return barRows(rows, rows[0][1], chartMode);
+}
+function shareBar() {
+  const top = D.frByCountry.slice(0, 3), rest = d3.sum(D.frByCountry.slice(3), (d) => d[1]), rows = rest ? [...top, ["Everywhere else", rest]] : top;
+  const tones = [C.ink, "#8f8d85", "#b9b7af", "#d9d7cf"], pct = (v) => 100 * v / D.totalMW;
+  return `<div class="sec"><div class="sech"><h2>Where frontier AI power sits</h2></div>
+    <div class="share">${rows.map(([nm, v], i) => `<i style="flex:${pct(v).toFixed(2)} 0 0;background:${tones[i]}" title="${esc(nm)}: ${power(v)}"></i>`).join("")}</div>
+    <div class="sharekey">${rows.map(([nm, v], i) => `<span><span class="sw sq" style="background:${tones[i]}"></span>${esc(nm)} <b>${pct(v) < 1 ? "<1" : Math.round(pct(v))}%</b></span>`).join("")}</div></div>`;
+}
+function overview() {
+  const n = D.mine.length;
+  return `<h1>Where the world’s compute is<sup>(land/sea/orbit)</sup></h1>
+    <p class="lede">Every mark is a real facility from public data. Very little of it takes a job from an AI agent. gpuroute routes to the part that does.</p>
+    <table class="access">
+      <tr><td>${sw("usable")}Usable now</td><td>${n || 1}</td><td><span class="yes">runs your agent’s jobs</span>${n ? "<br>" + esc(D.mine.map((e) => e.name).join(", ")) : ""}</td></tr>
+      <tr><td>${sw("orbit")}In orbit</td><td>${D.sats.length}</td><td>bookable, mock market</td></tr>
+      <tr><td>${sw("frontier")}Frontier AI sites</td><td>${D.epoch.length}</td><td>private, not rentable</td></tr>
+      <tr><td>${sw("datacenters")}Datacenters</td><td>${num(D.atlas.length)}</td><td>by contract, no agent API</td></tr>
+      <tr><td>${sw("undersea")}Underwater</td><td>${D.undersea.length}</td><td>not rentable</td></tr>
+      <tr><td>${sw("cables")}Cables</td><td>${D.cables.length}</td><td>carry the traffic between them</td></tr>
+    </table>
+    ${shareBar()}
+    <div class="sec"><div class="sech"><h2>Frontier AI power, by owner</h2><span class="note">${power(D.totalMW)} total</span></div>
+      ${ownerChart()}<p class="mute" style="font-size:12.5px;margin:8px 0 0">About ${(D.totalH100 / 1e6).toFixed(1)} million H100-equivalents across ${D.epoch.length} sites. Each spike on the map is one site; its height is the site’s power.</p></div>
+    <div class="sec"><div class="sech"><h2>Datacenters, top 10</h2>
+      <span class="seg" role="group" aria-label="Group by"><button data-mode="country" aria-pressed="${chartMode === "country"}">Countries</button><button data-mode="operator" aria-pressed="${chartMode === "operator"}">Operators</button></span></div>
+      ${placeChart()}<p class="mute" style="font-size:12.5px;margin:8px 0 0">The flat view adds a latitude histogram of the same ${num(D.atlas.length)} facilities.</p></div>
+    ${agentQ('world_compute(near="frankfurt", radius_km=100)')}
+    <p class="src">Sources: ATLAS Global Data Center Map · Epoch AI Frontier Data Centers (CC BY 4.0, geocoded with OpenStreetMap Nominatim) · TeleGeography Submarine Cable Map · CelesTrak orbital elements, propagated in your browser with SGP4 · underwater sites from public reporting, locations approximate.</p>`;
+}
+const dcRes = (i) => { const r = D.atlas[i]; return `<button class="res" data-dc="${i}"><b>${esc(r[2])}</b><div class="mute">${esc([r[3], [r[4], r[5]].filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</div></button>`; };
+const frRes = (d) => `<button class="res" data-fr="${D.epoch.indexOf(d)}"><b>${esc(d.name)}</b><div class="mute">${esc(d.owner)} · ${power(d.mw)}</div></button>`;
+function filterView() {
+  const f = filter, fr = [...f.fr], ops = d3.rollups(f.rows, (v) => v.length, (i) => D.atlas[i][3] || "Unknown").sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const kind = { search: "search", country: "country", operator: "operator", owner: "frontier AI owner" }[f.type];
+  const call = f.type === "search" ? `world_compute(search="${f.value}")` : f.type === "country" ? `world_compute(country="${f.value}")`
+    : f.type === "owner" ? `world_compute(layer="frontier", owner="${f.value}")` : `world_compute(layer="datacenters", search="${f.value}")`;
+  return `<button class="back" data-clear>Back to overview</button><div class="tag">${kind}</div><h3>${esc(f.label)}</h3>
+    <div class="kv"><div>datacenters</div><div>${num(f.rows.length)}${f.rows.length ? ` <span class="mute">(${(100 * f.rows.length / D.atlas.length).toFixed(1)}% of the map)</span>` : ""}</div>
+      <div>frontier AI</div><div>${fr.length ? `${fr.length} site${fr.length > 1 ? "s" : ""}, ${power(d3.sum(fr, (d) => d.mw))}` : "none"}</div></div>
+    ${!f.rows.length && !fr.length ? `<p class="mute">Nothing on the map matches. Try an operator (Equinix), a city (Frankfurt) or a country.</p>` : ""}
+    ${f.type !== "operator" && ops.length > 1 ? `<div class="sec"><div class="sech"><h2>Biggest operators here</h2></div>${barRows(ops.map(([n, v]) => [n === "Unknown" ? null : n, v, num(v), "Unknown operator"]), ops[0][1], "operator")}</div>` : ""}
+    ${fr.length ? `<div class="sec"><div class="sech"><h2>Frontier AI sites</h2></div>${fr.slice(0, 12).map(frRes).join("")}</div>` : ""}
+    ${f.rows.length ? `<div class="sec"><div class="sech"><h2>Datacenters</h2><span class="note">${f.rows.length > 40 ? "first 40 of " + num(f.rows.length) : ""}</span></div>${f.rows.slice(0, 40).map(dcRes).join("")}</div>` : ""}
+    ${agentQ(call)}`;
+}
+function stripPlot(d) {
+  const w = 360, x = (mw) => 4 + (w - 8) * mw / D.maxMW, rank = D.epoch.indexOf(d) + 1;
+  return `<div class="sec"><div class="sech"><h2>Power, against the other ${D.epoch.length - 1} sites</h2><span class="note">#${rank} of ${D.epoch.length}</span></div>
+    <svg class="stripplot" viewBox="0 0 ${w} 44" role="img" aria-label="${esc(d.name)} ranks ${rank} of ${D.epoch.length} frontier AI sites by power">
+      <line x1="4" x2="${w - 4}" y1="26" y2="26" stroke="${C.line}"/>
+      ${D.epoch.map((e) => `<line x1="${x(e.mw)}" x2="${x(e.mw)}" y1="18" y2="34" stroke="${C.ink}" stroke-opacity=".28"/>`).join("")}
+      <line x1="${x(d.mw)}" x2="${x(d.mw)}" y1="10" y2="38" stroke="${C.ink}" stroke-width="3" stroke-linecap="round"/>
+      <text x="4" y="44" font-size="10" fill="${C.mute}" font-family="JetBrains Mono, monospace">0</text>
+      <text x="${w - 4}" y="44" font-size="10" fill="${C.mute}" text-anchor="end" font-family="JetBrains Mono, monospace">${power(D.maxMW)}</text>
+    </svg></div>`;
+}
+function itemView() {
+  const h = sel, d = h.d, back = `<button class="back" data-back>${filter ? "Back to results" : "Back to overview"}</button>`;
+  if (h.kind === "dc") {
+    const km = (a, b) => 12742 * Math.asin(Math.sqrt(Math.sin((b[1] - a[1]) * RAD / 2) ** 2 + Math.cos(a[1] * RAD) * Math.cos(b[1] * RAD) * Math.sin((b[0] - a[0]) * RAD / 2) ** 2));
+    const near = D.atlas.filter((r) => r !== d && Math.abs(r[1] - d[1]) < 1 && km(d, r) <= 50).length, opN = d[3] ? D.atlas.filter((r) => r[3] === d[3]).length : 0;
+    return `${back}<div class="tag">datacenter · ATLAS</div><h3>${esc(d[2])}</h3>
+      <div class="kv"><div>operator</div><div>${d[3] ? `<button class="res" style="border:0;padding:0" data-operator="${esc(d[3])}"><b>${esc(d[3])}</b> <span class="mute">${num(opN)} site${opN > 1 ? "s" : ""} worldwide</span></button>` : "not listed"}</div>
+        <div>city</div><div>${esc(d[4] || "not listed")}</div><div>country</div><div>${esc(d[5] || "not listed")}</div>
+        <div>neighbours</div><div>${num(near)} other datacenter${near === 1 ? "" : "s"} within 50 km</div>
+        <div>agent access</div><div>colocation: rentable by contract, not by API</div></div>
+      ${agentQ(`world_compute(layer="datacenters", lat=${d[1]}, lon=${d[0]}, radius_km=50)`)}`;
+  }
+  if (h.kind === "frontier") return `${back}<div class="tag">frontier AI site · Epoch AI</div><h3>${esc(d.name)}</h3>
+      <div class="kv"><div>owner</div><div><button class="res" style="border:0;padding:0" data-owner="${esc(d.owner)}"><b>${esc(d.owner)}</b></button></div>
+        <div>power</div><div>${power(d.mw)}</div><div>compute</div><div>${num(d.h100e)} H100-equivalents</div><div>country</div><div>${esc(d.country)}</div>
+        <div>agent access</div><div>private: not rentable</div></div>${stripPlot(d)}
+      ${agentQ(`world_compute(layer="frontier", owner="${(d.owner || "").split(" ")[0]}")`)}`;
+  if (h.kind === "undersea") return `${back}<div class="tag">underwater datacenter</div><h3>${esc(d.name)}</h3>
+      <div class="kv"><div>status</div><div>${esc(d.status)}</div><div>what</div><div>${esc(d.what)}</div><div>location</div><div>approximate, from public reporting</div>
+        <div>agent access</div><div>not rentable</div></div>${agentQ('world_compute(layer="undersea")')}`;
+  if (h.kind === "cable") return `${back}<div class="tag">undersea cable · TeleGeography</div><h3>${esc(d.n)}</h3>
+      <div class="kv"><div>agent access</div><div>not compute: it carries the traffic between sites</div></div>${agentQ(`world_compute(layer="cables", search="${d.n}")`)}`;
+  if (h.kind === "usable") return `${back}<div class="tag">usable now</div><h3>Your agent can run here</h3>
+      ${D.mine.length ? `<div class="kv">${D.mine.map((e) => `<div>${esc(e.name)}</div><div>${esc(e.gpu || "")} · ${e.available ? "idle" : "busy"}</div>`).join("")}</div>`
+        : `<p class="mute">Run <span class="mono">gpuroute ui</span> to see your own machines here.</p>`}
+      ${agentQ('run_workload("embed.py", target="auto")')}`;
+  if (h.kind === "sat") {
+    const s = SKY.sats.find((q) => q.sat === d), tl = s.tl, win = (o) => `${hhmm(o.a)}–${hhmm(o.b)} UTC`;
+    return `${back}<div class="tag">orbital compute · live</div><h3>${esc(d.name)}</h3>
+      <div class="kv"><div>now</div><div>${Math.round(s.now.alt)} km up, over ${Math.abs(s.now.lat).toFixed(1)}°${s.now.lat >= 0 ? "N" : "S"} ${Math.abs(s.now.lon).toFixed(1)}°${s.now.lon >= 0 ? "E" : "W"}, ${s.now.sunlit ? "sunlit" : "in Earth’s shadow"}</div>
+        <div>hardware</div><div>${esc(d.what)}</div><div>power</div><div>${d.op.needs_sun ? "solar: computes only while sunlit" : "station power: always on"}</div></div>
+      <div class="sec"><div class="sech"><h2>Compute windows</h2></div>${tl.compute.map((c) => `<div class="res"><b>${win(c)}</b>${c.openNow ? " · open now" : ""}<div class="mute">${c.mins} min${c.price != null ? ` · $${c.price}/GPU-min` : ""} · downlink ${esc(c.downlink)}</div><div class="mono mute">${c.id}</div></div>`).join("") || `<p class="mute">No window in the next 6 hours.</p>`}</div>
+      <div class="sec"><div class="sech"><h2>Downlink passes</h2></div>${tl.relay.slice(0, 6).map((r) => `<div class="res"><b>${esc(r.station)}</b> · ${win(r)}<div class="mute">${r.gb} GB · ${r.max}° max elevation · $${r.price}/GB</div></div>`).join("") || `<p class="mute">No pass in the next 6 hours.</p>`}</div>
+      <p class="mute" style="font-size:12.5px">Orbits, sunlight and passes are computed from real orbital elements. Operator listings and prices are mock, and booked jobs are emulated on ground GPUs.</p>
+      ${agentQ(tl.compute[0] ? `book_orbital("${tl.compute[0].id}", "benchmark.py", budget_usd=1)` : "orbital_offers()")}`;
+  }
+  return "";
+}
+function renderRail() { const r = $("rail"); r.innerHTML = sel ? itemView() : filter ? filterView() : overview(); r.scrollTop = 0; }
+$("rail").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return; const ds = b.dataset;
+  if ("clear" in ds) { setFilter(null); $("zreset").click(); }
+  else if ("back" in ds) { sel = null; renderRail(); render(); }
+  else if (ds.mode) { chartMode = ds.mode; renderRail(); }
+  else if (ds.owner) setFilter({ type: "owner", value: ds.owner, label: ds.owner });
+  else if (ds.country) setFilter({ type: "country", value: ds.country, label: ds.country });
+  else if (ds.operator) setFilter({ type: "operator", value: ds.operator, label: ds.operator });
+  else if (ds.dc) select({ kind: "dc", i: +ds.dc, d: D.atlas[+ds.dc] });
+  else if (ds.fr) select({ kind: "frontier", d: D.epoch[+ds.fr] });
+});
+
+/* ---------- chips, size key ---------- */
+function renderChips() {
+  $("chips").innerHTML = LAYERS.map((l) => `<button class="chip" data-layer="${l.id}" aria-pressed="${l.on}"><span class="sw ${l.sw}" style="background:${l.color};border-color:${l.color}"></span>${l.label}</button>`).join("");
+}
+$("chips").addEventListener("click", (ev) => { const b = ev.target.closest("[data-layer]"); if (!b) return; const l = LAYERS.find((x) => x.id === b.dataset.layer); l.on = !l.on; renderChips(); render(); });
+function drawKey() {
+  const h = Math.min($("stage").clientHeight * .2, 110) * 300 / D.maxMW, globe = V.mode === "globe";
+  $("key").innerHTML = `<svg width="22" height="${Math.ceil(h) + 4}" aria-hidden="true"><path d="M7.6 ${h + 2}L11 2l3.4 ${h}z" fill="rgba(13,13,12,.16)" stroke="${C.ink}" stroke-width="1.1" stroke-linejoin="round"/></svg>
+    <div><b>300 MW</b> of frontier AI power, at full view.<br>${globe ? "Dark side is night right now; datacenters there are lit. Satellites fly at true altitude." : "Shaded side is night right now; datacenters there are lit."}</div>`;
+}
+
+/* ---------- orbit timeline ---------- */
+function drawStrip() {
+  const svg = $("orbitsvg"), w = svg.clientWidth || 600, LW = w < 520 ? 96 : 168, x0 = LW, x1 = w - 8, rowH = 40, top = 20;
+  if (!SKY.sats.length) return;
+  const now = SKY.sats[0].built, x = (t) => x0 + (x1 - x0) * (t - now) / (6 * 3600000), h = top + rowH * SKY.sats.length + 2;
+  svg.setAttribute("height", h); svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  let out = "";
+  for (let t = Math.ceil(now / 3600000) * 3600000; t <= now + 6 * 3600000; t += 3600000) {
+    out += `<line x1="${x(t)}" x2="${x(t)}" y1="${top - 4}" y2="${h}" stroke="${C.line}"/>`;
+    if (x(t) - x0 > 34) out += `<text x="${x(t)}" y="11" font-size="10" fill="${C.mute}" text-anchor="middle" font-family="JetBrains Mono, monospace">${hhmm(t)}</text>`;
+  }
+  out += `<text x="${x0}" y="11" font-size="10" fill="${C.ink}" font-family="JetBrains Mono, monospace">now</text><line x1="${x0}" x2="${x0}" y1="${top - 4}" y2="${h}" stroke="${C.ink}"/>`;
+  SKY.sats.forEach((s, i) => {
+    const y = top + i * rowH, st = s.now || {};
+    out += `<g class="hit" data-sat="${i}"><rect x="0" y="${y}" width="${LW - 6}" height="${rowH}" fill="transparent"/>
+      <text x="0" y="${y + 16}" font-size="13" font-weight="600" fill="${C.ink}">${esc(s.sat.name)}</text>
+      <text x="0" y="${y + 31}" font-size="11" fill="${C.mute}">${st.alt ? Math.round(st.alt) + " km · " + (st.sunlit ? "sunlit" : "in shadow") : ""}</text></g>`;
+    if (i) out += `<line x1="0" x2="${w}" y1="${y}" y2="${y}" stroke="${C.line}"/>`;
+    s.tl.compute.forEach((c, j) => { out += `<rect class="hit" data-sat="${i}" data-c="${j}" x="${x(c.a) + (c.openNow ? 0 : 1)}" y="${y + 7}" width="${Math.max(2, x(c.b) - x(c.a) - 2)}" height="12" rx="4" fill="${C.orbit}"/>`; });
+    s.tl.relay.forEach((r, j) => { out += `<rect class="hit" data-sat="${i}" data-r="${j}" x="${x(r.a) - 1}" y="${y + 24}" width="${Math.max(4, x(r.b) - x(r.a))}" height="6" rx="3" fill="${C.ink}"/><rect class="hit" data-sat="${i}" data-r="${j}" x="${x(r.a) - 5}" y="${y + 20}" width="${Math.max(12, x(r.b) - x(r.a) + 8)}" height="16" fill="transparent"/>`; });
+  });
+  svg.innerHTML = out;
+}
+$("orbitsvg").addEventListener("mousemove", (ev) => {
+  const g = ev.target.closest("[data-sat]"); if (!g) return hideTip();
+  const s = SKY.sats[+g.dataset.sat], win = (o) => `${hhmm(o.a)}–${hhmm(o.b)} UTC`;
+  if (g.dataset.c != null) { const c = s.tl.compute[+g.dataset.c]; showTip(`<b>${esc(s.sat.name)} compute</b> · ${win(c)}<br><span class="t2">${c.mins} min · ${esc(c.power)}${c.price != null ? ` · $${c.price}/GPU-min` : ""}<br>downlink: ${esc(c.downlink)}</span>`, ev); }
+  else if (g.dataset.r != null) { const r = s.tl.relay[+g.dataset.r]; showTip(`<b>${esc(r.station)}</b> · ${win(r)}<br><span class="t2">${r.gb} GB down · ${r.max}° max elevation · $${r.price}/GB</span>`, ev); }
+  else showTip(`<b>${esc(s.sat.name)}</b><br><span class="t2">${esc(s.sat.what)}</span>`, ev);
+});
+$("orbitsvg").addEventListener("mouseleave", hideTip);
+$("orbitsvg").addEventListener("click", (ev) => { const g = ev.target.closest("[data-sat]"); if (g) select({ kind: "sat", d: SKY.sats[+g.dataset.sat].sat }); });
+
+/* ---------- search + keys ---------- */
+let searchT = null;
+$("q").addEventListener("input", (ev) => { clearTimeout(searchT); searchT = setTimeout(() => {
+  const v = ev.target.value.trim().toLowerCase(); if (v.length < 2) { if (filter) { setFilter(null); $("zreset").click(); } return; }
+  setFilter({ type: "search", value: v, label: v });
+}, 220); });
+addEventListener("keydown", (ev) => {
+  if (ev.key === "/" && document.activeElement !== $("q")) { ev.preventDefault(); $("q").focus(); }
+  if (ev.key === "Escape") { if (sel) { sel = null; renderRail(); render(); } else if (filter) { setFilter(null); $("zreset").click(); } $("q").blur(); }
+});
+
+/* ---------- go ---------- */
+load().then(async () => {
+  D.undersea.forEach((d) => { d.short = d.name.split(" (")[0].replace(/ (undersea |underwater )?data center/i, ""); });
+  $("loading").remove(); renderChips(); d3.select(cv).call(zoom).on("dblclick.zoom", null);
+  document.querySelectorAll("#viewseg button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === V.mode));
+  if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1200))]);
+  rebuild(); renderRail(); requestAnimationFrame(loop);
+  const q0 = new URLSearchParams(location.search).get("q");
+  if (q0 && q0.trim().length >= 2) { $("q").value = q0; setFilter({ type: "search", value: q0.trim().toLowerCase(), label: q0.trim().toLowerCase() }); }
+  let rz = null; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if ($("stage").clientWidth !== W || $("stage").clientHeight !== H) rebuild(); }, 120); }).observe($("stage"));
+  setInterval(tick, 1000);
+  setInterval(() => { updateSky(); drawStrip(); if (sel && sel.kind === "sat") renderRail(); }, 30000);
+}).catch((e) => { $("loading").textContent = "Couldn’t load the map data. Check your connection and reload."; console.error(e); });
+</script>
+</body>
+</html>

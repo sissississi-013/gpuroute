@@ -8,35 +8,46 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #ffffff; --ink: #0d0d0c; --mute: #8a8880; --line: #d9d7cf; --card: #fbfaf7;
-    --go: #2f7d5b; --wait: #c96a1f; --stop: #b33a3a;
+    --paper: #ffffff; --ink: #0d0d0c; --mute: #77756d; --line: #dedcd4; --soft: #efede7; --card: #f8f7f3;
+    --go: #0f7350; --wait: #b25a12; --stop: #b33a3a; --sea: #2f66d6; --orbit: #ee6a2a;
     --sans: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
-  body { font-size: 15px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+  body { font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
   a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--sea); outline-offset: 2px; }
   button { font: 500 14px var(--sans); color: var(--ink); background: none; border: 1px solid var(--ink);
-           border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+           border-radius: 999px; padding: 7px 16px; cursor: pointer; white-space: nowrap; }
   button.solid { background: var(--ink); color: var(--paper); }
+  button:hover { background: var(--ink); color: var(--paper); }
+  button.solid:hover { background: #33322f; }
   button:disabled { opacity: .4; cursor: default; }
 
-  .bar { position: fixed; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: baseline;
+  /* ---- top bar: blends over the hero photo, solid everywhere else ---- */
+  .bar { position: fixed; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
          padding: 12px 13px; z-index: 10; font-size: 19px; font-weight: 500; letter-spacing: -0.01em;
-         color: #fff; mix-blend-mode: difference; }
-  .bar .tabs a.on { border-bottom-color: #fff !important; }
-  .dot { background: #fff !important; }
-  .bar .tabs a { text-decoration: none; padding-bottom: 2px; }
-  .bar .tabs a.on { border-bottom: 1.5px solid var(--ink); }
+         background: var(--paper); border-bottom: 1px solid var(--line); }
+  body[data-tab="overview"] .bar { color: #fff; mix-blend-mode: difference; background: none; border-bottom-color: transparent; }
+  .bar a { text-decoration: none; }
+  .bar .tabs a { padding-bottom: 2px; color: var(--mute); border-bottom: 1.5px solid transparent; }
+  .bar .tabs a:hover, .bar .tabs a.on { color: var(--ink); }
+  .bar .tabs a.on { border-bottom-color: var(--ink); }
+  body[data-tab="overview"] .bar .tabs a { color: #fff; }
+  body[data-tab="overview"] .bar .tabs a.on { border-bottom-color: #fff; }
+  .bar .left { white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .bar .left::-webkit-scrollbar { display: none; }
   .bar .right { display: flex; align-items: center; white-space: pre; }
   .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--ink); display: inline-block; margin-left: 8px; }
   .dot.live { background: var(--go); }
+  body[data-tab="overview"] .dot, body[data-tab="overview"] .dot.live { background: #fff; }
 
-  section.tab { display: none; min-height: 100vh; padding: 88px 24px 48px; }
+  section.tab { display: none; min-height: 100vh; padding: 92px 24px 96px; max-width: 1560px; margin: 0 auto; }
   section.tab.on { display: block; }
 
-  #overview { position: relative; height: 100vh; min-height: 620px; padding: 0; overflow: hidden; background: #fff; }
+  /* ---- overview hero ---- */
+  #overview { position: relative; height: 100vh; min-height: 620px; padding: 0; overflow: hidden; background: #fff; max-width: none; }
   .hero-box { position: absolute; left: 25.2%; width: 50.2%; top: 0; height: 86%; overflow: hidden; z-index: 2; }
   .hero-box img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; display: block;
                   filter: brightness(.72) contrast(1.08) saturate(.9); }
@@ -48,82 +59,162 @@
   .wordmark.glow { color: rgba(255,255,255,.34); text-shadow: 0 0 40px rgba(255,255,255,.28); }
   .wordmark.light { color: #fff; mix-blend-mode: overlay; }
   .corner { position: absolute; font-size: 15px; }
-  .blurb { left: 13px; bottom: 14px; width: 330px; color: #8a8a8a; line-height: 1.33; }
-  .credit { left: calc(75.4% + 8px); top: calc(86% - 26px); width: 230px; font-size: 10px; color: #b0b0b0; line-height: 1.3; }
-  .cta { right: 13px; bottom: 12px; font-size: 19px; font-weight: 500; color: #8a8a8a; text-decoration: none; }
+  .blurb { left: 13px; bottom: 14px; width: 330px; color: #77756d; line-height: 1.33; }
+  .blurb b { display: block; color: var(--ink); font-weight: 500; margin-top: 10px; }
+  .credit { left: calc(75.4% + 8px); top: calc(86% - 26px); width: 230px; font-size: 10px; color: #a3a199; line-height: 1.3; }
+  .cta { right: 13px; bottom: 12px; font-size: 19px; font-weight: 500; color: #77756d; text-decoration: none; }
   .cta:hover { color: var(--ink); }
-  h2.big { font-size: clamp(56px, 9vw, 150px); font-weight: 500; letter-spacing: -0.055em; line-height: .9; margin: 24px 0 40px; }
-  h2.big sup { font-size: .22em; letter-spacing: 0; vertical-align: top; font-family: var(--mono); font-weight: 400; color: var(--mute); }
-  .lede { max-width: 640px; color: var(--mute); font-size: 18px; margin: -16px 0 40px; }
-  .row { display: grid; grid-template-columns: 70px 1.4fr 1.3fr 1fr 150px; gap: 20px; align-items: baseline;
-         padding: 22px 0; border-top: 1px solid var(--line); }
-  .row:last-child { border-bottom: 1px solid var(--line); }
-  .idx { font-family: var(--mono); font-size: 13px; color: var(--mute); }
-  .name { font-size: clamp(28px, 3.4vw, 52px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
+
+  /* ---- page head: title left, what-this-is right ---- */
+  .head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: 32px; align-items: end; margin: 0 0 44px; }
+  h2.big { font-size: clamp(56px, 8.4vw, 136px); font-weight: 500; letter-spacing: -0.055em; line-height: .86; margin: 0; }
+  h2.big sup { font-size: .2em; letter-spacing: 0; vertical-align: top; position: relative; top: .5em; margin-left: .3em;
+               font-family: var(--mono); font-weight: 400; color: var(--mute); }
+  .lede { color: var(--mute); font-size: 17px; line-height: 1.4; margin: 0 0 6px; }
+  .lede .mono { font-size: .85em; color: var(--ink); }
+
+  h3 { font-size: 15px; font-weight: 500; margin: 0; padding: 12px 0 10px; border-top: 1px solid var(--ink);
+       display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  h3 span, h3 a { font: 400 13px var(--mono); color: var(--mute); }
+  h3 a:hover { color: var(--ink); }
+  .block { margin-top: 56px; }
+
   .meta { color: var(--mute); font-size: 14px; }
   .mono { font-family: var(--mono); font-size: 13px; }
-  .pill { display: inline-block; font: 500 12px var(--mono); padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; }
+  .idx { font-family: var(--mono); font-size: 13px; color: var(--mute); }
+  .pill { display: inline-block; font: 500 12px var(--mono); padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
   .go { color: var(--go); } .wait { color: var(--wait); } .stop { color: var(--stop); } .mutec { color: var(--mute); }
-  .meter { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px; width: 160px; }
-  .meter i { display: block; height: 100%; background: var(--ink); }
-  .cmd { font-family: var(--mono); font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-         padding: 14px 16px; display: flex; justify-content: space-between; gap: 16px; align-items: center; overflow-x: auto; }
-  .cmd code { white-space: nowrap; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-  .figure { font-size: clamp(44px, 6vw, 96px); font-weight: 500; letter-spacing: -0.05em; line-height: 1; }
-  .figs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; border-top: 1px solid var(--ink); padding-top: 16px; }
+
+  /* ---- figures ---- */
+  .figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; border-top: 1px solid var(--ink); padding-top: 14px; }
+  .figure { font-size: clamp(38px, 4.8vw, 76px); font-weight: 500; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .figure small { font-size: .38em; letter-spacing: -0.02em; color: var(--mute); margin-left: .25em; font-weight: 400; }
+  .figs .meta { margin-top: 8px; max-width: 260px; }
+  .figs a { text-underline-offset: 3px; }
+
+  /* ---- rows ---- */
+  .row { display: grid; gap: 20px; align-items: start; padding: 18px 0; border-top: 1px solid var(--line); }
+  .row > * { min-width: 0; }
+  .rows > .row:last-child { border-bottom: 1px solid var(--line); }
+  .name { font-size: clamp(26px, 2.9vw, 44px); font-weight: 500; letter-spacing: -0.04em; line-height: 1; overflow-wrap: anywhere; }
+  .name.s { font-size: 24px; letter-spacing: -0.03em; line-height: 1.1; }
+  .row .idx { padding-top: 6px; }
+  .end { text-align: right; }
+
+  .compute .row { grid-template-columns: 56px minmax(0, 1.1fr) minmax(0, 1.7fr) minmax(0, 1fr) 132px; }
+  .compute.quiet .row { padding: 14px 0; }
+  .load { display: grid; grid-template-columns: 34px minmax(0, 1fr) 44px; gap: 4px 8px; align-items: center; max-width: 240px;
+          font: 12px var(--mono); color: var(--mute); margin-bottom: 8px; }
+  .load b { font-weight: 400; color: var(--ink); text-align: right; }
+  .track { height: 6px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+  .track i { display: block; height: 100%; background: var(--ink); border-radius: 3px; }
+  .track i.hot { background: var(--wait); }
+
+  .steps .row { grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1.5fr); padding: 26px 0; }
+  .steps .name { margin-bottom: 10px; }
+  .steps .meta { max-width: 440px; }
+  .cmds { display: flex; flex-direction: column; gap: 8px; }
+  .cmd { font-family: var(--mono); font-size: 13px; line-height: 1.5; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+         padding: 12px 12px 12px 16px; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+  .cmd code { font: inherit; overflow-wrap: anywhere; min-width: 0; }
+  .cmd code::before { content: "$ "; color: var(--mute); }
+  .cmd .meta { font-family: var(--sans); font-size: 13px; text-align: right; flex: none; }
+  .cmd button { font-size: 13px; padding: 5px 13px; flex: none; background: var(--paper); }
+  .cmd button:hover { background: var(--ink); }
+  .asks { margin: 0; padding: 0; list-style: none; font-size: clamp(19px, 1.8vw, 26px); letter-spacing: -0.02em; line-height: 1.25; }
+  .asks li { padding: 10px 0; border-top: 1px solid var(--line); }
+  .asks li:first-child { border-top: 0; padding-top: 0; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 32px; padding-top: 6px; }
+  .two p { font-size: 20px; letter-spacing: -0.02em; line-height: 1.3; max-width: 480px; margin: 0; }
+
+  /* ---- jobs ---- */
+  .mix { display: flex; gap: 2px; height: 14px; margin: 4px 0 12px; }
+  .mix i { display: block; border-radius: 3px; min-width: 4px; }
+  .mixkey { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .chip { font: 400 13px var(--mono); border-color: var(--line); padding: 5px 12px; display: inline-flex; align-items: center; gap: 8px; }
+  .chip:hover { background: var(--card); color: var(--ink); border-color: var(--ink); }
+  .chip.on, .chip.on:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .chip em { font-style: normal; opacity: .6; }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; justify-content: space-between; margin: 0 0 14px; }
+  .jobs .row { grid-template-columns: 56px minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 220px) 132px; padding: 16px 0; }
+  .jobs .name.s { margin-bottom: 5px; }
+  .gpus { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; font: 12px var(--mono); }
+  .out { font: 12px var(--mono); margin-top: 6px; overflow-wrap: anywhere; }
+  details { margin-top: 6px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--stop); overflow-wrap: anywhere; }
+  pre { font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card); border: 1px solid var(--line);
+        border-radius: 8px; padding: 10px 12px; margin: 8px 0 0; max-height: 220px; overflow: auto; color: var(--ink); }
+  svg.spark { width: 150px; height: 40px; display: block; margin-top: 6px; }
+
+  /* ---- spend ---- */
+  .wallet { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 32px; align-items: end; border-top: 1px solid var(--ink); padding-top: 14px; }
+  .wallet .figure { font-size: clamp(64px, 9vw, 148px); }
+  .budget { display: flex; gap: 2px; height: 18px; }
+  .budget i { display: block; border-radius: 3px; }
+  .budget .sp { background: var(--ink); } .budget .av { background: var(--soft); }
+  .budget .rs { background: repeating-linear-gradient(135deg, var(--ink) 0 2px, var(--soft) 2px 6px); }
+  .scale { display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--mute); margin-top: 6px; }
+  .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+  .facts div { border-top: 1px solid var(--line); padding-top: 8px; }
+  .facts b { display: block; font-size: 24px; font-weight: 500; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .facts i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
   .approval { border: 1.5px solid var(--wait); border-radius: 14px; padding: 20px; display: flex; justify-content: space-between;
               gap: 20px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-  form.q { display: grid; grid-template-columns: 2fr repeat(4, 1fr) auto; gap: 10px; align-items: end; }
+  .prov .row { grid-template-columns: 56px minmax(0, 1fr) minmax(0, 2fr) auto; align-items: center; }
+  .prov .row .idx { padding-top: 0; }
+  form.q { display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto; gap: 10px; align-items: end; padding-top: 6px; }
   label { font-size: 12px; color: var(--mute); display: flex; flex-direction: column; gap: 6px; }
   input, select { font: 14px var(--mono); padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
-                  background: var(--card); color: var(--ink); width: 100%; }
+                  background: var(--card); color: var(--ink); width: 100%; height: 40px; }
+  form.q button { height: 40px; }
   table { width: 100%; border-collapse: collapse; }
-  td, th { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: top; }
-  th { font-weight: 500; color: var(--mute); font-size: 13px; }
-  td.mono { font-size: 12px; }
+  td, th { text-align: left; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+  th { font-weight: 400; color: var(--mute); font-size: 13px; border-top: 0; }
+  td.num { font: 13px var(--mono); white-space: nowrap; }
+  td .track { width: 120px; display: inline-block; vertical-align: middle; margin-right: 10px; }
+  tr.rec td { background: #f1f7f4; } tr.rec td:first-child { box-shadow: inset 3px 0 0 var(--go); padding-left: 12px; }
   .scroll { overflow-x: auto; }
-  svg.spark { width: 150px; height: 40px; }
-  html.static button:not(.copy), html.static .approval button { display: none; }
-  html.static #qform button { display: inline-block; }
-  .snapnote { display: none; }
-  html.static .snapnote { display: block; }
-  .mapbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-  .mapbar input { max-width: 520px; flex: 1 1 320px; font-family: var(--sans); font-size: 15px; padding: 11px 14px; border-radius: 999px; }
-  #chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { font: 500 13px var(--sans); border-radius: 999px; padding: 6px 12px; border: 1px solid var(--line); cursor: pointer;
-          background: var(--paper); color: var(--mute); display: inline-flex; gap: 6px; align-items: center; user-select: none; }
-  .chip.on { border-color: var(--ink); color: var(--ink); }
-  .chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .mapwrap { display: grid; grid-template-columns: 1fr 340px; gap: 0; border: 1px solid var(--ink); border-radius: 14px; overflow: hidden; }
-  .mapstage { position: relative; background: #fbfaf7; }
-  #world { width: 100%; height: auto; display: block; cursor: grab; }
-  #world:active { cursor: grabbing; }
-  #tip { position: absolute; pointer-events: none; display: none; background: #0d0d0c; color: #fff; font-size: 13px;
-         padding: 8px 10px; border-radius: 6px; max-width: 280px; line-height: 1.35; z-index: 3; }
-  .zoombtns { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .zoombtns button { width: 34px; height: 34px; padding: 0; background: var(--paper); font-size: 18px; line-height: 1; }
-  .mapstat { position: absolute; right: 12px; bottom: 12px; color: var(--mute); font-size: 12px; background: rgba(255,255,255,.8); padding: 4px 8px; border-radius: 6px; }
-  .panel { border-left: 1px solid var(--ink); padding: 20px; max-height: 720px; overflow-y: auto; background: var(--paper); }
-  .panel h3 { font-size: 30px; font-weight: 500; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 10px; }
-  .panel .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 14px; margin: 14px 0; }
-  .panel .kv div:nth-child(odd) { color: var(--mute); }
-  .panel .agentq { background: #0d0d0c; color: #f1f0ea; border-radius: 10px; padding: 12px; font: 12px/1.5 var(--mono); margin-top: 14px; word-break: break-word; }
-  .panel .res { padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; font-size: 14px; }
-  .panel .res:hover { color: var(--go); }
-  @media (max-width: 900px) { .mapwrap { grid-template-columns: 1fr; } .panel { border-left: none; border-top: 1px solid var(--ink); } }
+
+  /* ---- log ---- */
+  .day { margin-top: 36px; }
+  .log .row { grid-template-columns: 84px 170px minmax(0, 1fr) auto; padding: 11px 0; gap: 16px; align-items: baseline; }
+  .log .row .idx { padding-top: 0; }
+  .ev { display: flex; align-items: baseline; gap: 9px; font-weight: 500; }
+  .ev i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--mute); position: relative; top: -1px; }
+  .ev i.launched { background: none; box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .ev i.ok { background: var(--go); } .ev i.bad { background: var(--stop); } .ev i.orbit { background: var(--orbit); } .ev i.sea { background: var(--sea); }
+  .log .what b { font-weight: 500; }
+  .log .what .meta { margin-left: 2px; }
+
   .empty { color: var(--mute); padding: 32px 0; border-top: 1px solid var(--line); font-size: 18px; }
-  @media (max-width: 820px) {
-    .row { grid-template-columns: 40px 1fr; } .row > :nth-child(n+3) { grid-column: 2; }
-    .two, .figs { grid-template-columns: 1fr 1fr; } form.q { grid-template-columns: 1fr 1fr; }
-    #field { width: 72vw; } .legend { display: none; } .bar { font-size: 14px; flex-wrap: wrap; gap: 6px; }
+  html.static .act { display: none; }
+  .snapnote { display: none; }
+  html.static .snapnote { display: block; margin: 0 0 28px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; max-width: 640px; }
+
+  @media (max-width: 900px) {
+    .bar { font-size: 15px; }
+    .bar .right a { display: none; }
+    section.tab { padding: 76px 16px 72px; }
+    .head { grid-template-columns: 1fr; gap: 18px; margin-bottom: 32px; }
+    .figs, .facts { grid-template-columns: 1fr 1fr; }
+    .wallet, .two { grid-template-columns: 1fr; gap: 20px; }
+    .steps .row, .compute .row, .jobs .row, .prov .row { grid-template-columns: 34px minmax(0, 1fr); gap: 10px 12px; }
+    .steps .row > :nth-child(n+3), .compute .row > :nth-child(n+3), .jobs .row > :nth-child(n+3), .prov .row > :nth-child(n+3) { grid-column: 2; }
+    .end { text-align: left; }
+    .log .row { grid-template-columns: 70px minmax(0, 1fr); gap: 4px 12px; }
+    .log .row > :nth-child(n+3) { grid-column: 2; }
+    form.q { grid-template-columns: 1fr 1fr; } form.q label:first-child { grid-column: 1 / -1; }
+    .hero-box { height: 64%; } .hero-box .wm-frame { height: 156.25%; }
+    .blurb { width: auto; right: 16px; bottom: 52px; } .cta { right: auto; left: 13px; }
+    .credit { left: auto; right: 13px; top: auto; bottom: 14px; width: 170px; text-align: right; }
   }
 </style>
 </head>
 <body>
 <nav class="bar">
-  <div>gpuroute&nbsp;&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#start">Start</a>/<a href="#map">Map</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
-  <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank" style="text-decoration:none">GitHub</a>, <a href="#compute" style="text-decoration:none">Share</a>, <a href="#spend" style="text-decoration:none">Spend</a><span class="dot" id="livedot"></span><span id="clock" style="display:none"></span></div>
+  <div class="left">gpuroute&nbsp;&nbsp;&nbsp;<span class="tabs">(<a href="#overview">Overview</a>/<a href="#start">Start</a>/<a href="map.html">Map</a>/<a href="#compute">Compute</a>/<a href="#jobs">Jobs</a>/<a href="#spend">Spend</a>/<a href="#log">Log</a>)</span></div>
+  <div class="right"><a href="https://github.com/sissississi-013/gpuroute" target="_blank" rel="noopener">GitHub</a><span class="dot" id="livedot" title="checking what is usable"></span></div>
 </nav>
 
 <section class="tab" id="overview">
@@ -133,115 +224,99 @@
     <div class="wm-frame"><div class="wordmark glow">gpuroute©</div></div>
     <div class="wm-frame"><div class="wordmark light">gpuroute©</div></div>
   </div>
-  <span id="usable2" hidden></span>
-  <div class="corner credit">Photo: CERN Computer Centre, Simon Waldherr, CC BY-SA 4.0, Wikimedia Commons</div>
-  <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market.</div>
+    <div class="corner credit">Photo: CERN Computer Centre, Simon Waldherr, CC BY-SA 4.0, Wikimedia Commons</div>
+  <div class="corner blurb">gpuroute shows your agents every idle GPU they can use, from a teammate’s laptop to free tiers and the spare-GPU market.<b id="herolive"></b></div>
   <a class="corner cta" href="#start">(Get Started)</a>
 </section>
 
-<section class="tab" id="start">
-  <p class="snapnote meta" style="margin:0 0 -40px">This is a public snapshot. Install gpuroute and run <span class="mono">gpuroute ui</span> for your live dashboard.</p>
-  <h2 class="big">Start<sup>(3 steps)</sup></h2>
-  <p class="lede">One command to connect your agents, one to share a spare machine, then just ask.</p>
-  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
-    <div class="idx">(01)</div><div><div class="name">Connect</div><div class="meta">Checks this machine and adds gpuroute to Claude Code and Codex, or prints the config for Cursor.</div></div>
-    <div class="cmd"><code id="c1">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute init</code><button class="copy" onclick="copy('c1',this)">Copy</button></div>
-  </div>
-  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
-    <div class="idx">(02)</div><div><div class="name">Pool</div><div class="meta">Run <span class="mono">gpuroute hub</span> once to get your pool code. Then anyone, anywhere (a friend’s gaming PC, a lab box, a teammate’s laptop) joins with one command. It connects outbound, so there’s no network setup. It only takes jobs while idle, and the owner sees each one.</div></div>
-    <div style="display:flex;flex-direction:column;gap:8px"><div class="cmd"><code>gpuroute hub</code><span class="meta">you, once: prints the pool code</span></div>
-      <div class="cmd"><code id="c2">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --pool "&lt;pool code&gt;" --name &lt;name&gt;</code><button class="copy" onclick="copy('c2',this)">Copy</button></div></div>
-  </div>
-  <div class="row" style="grid-template-columns:70px 1fr 1.6fr">
-    <div class="idx">(03)</div><div><div class="name">Ask</div><div class="meta">Your agent calls compute_map, run_workload, quote_job and launch_job itself.</div></div>
-    <div style="font-size:24px;letter-spacing:-.02em;line-height:1.35">“What compute can you use right now?”<br>“Embed my notes on a GPU. Don’t hog my laptop.”<br>“Fine-tune Qwen2.5-0.5B on my data for under $1.”</div>
-  </div>
-</section>
 
-<section class="tab" id="map">
-  <h2 class="big">Map<sup>(land/sea/orbit)</sup></h2>
-  <p class="lede">Where the world’s compute physically is, and how much of it your agent can actually use. Agents query the same data with <span class="mono">world_compute</span>.</p>
-  <div class="mapbar">
-    <input id="msearch" placeholder="Search datacenters, operators, cities (e.g. Equinix, Frankfurt, Microsoft)" autocomplete="off">
-    <div id="chips"></div>
-  </div>
-  <div class="mapwrap">
-    <div class="mapstage">
-      <svg id="world" viewBox="0 0 1600 820" role="img" aria-label="Interactive world map of compute: datacenters, frontier AI sites, undersea cables, underwater datacenters and satellites"></svg>
-      <div id="tip"></div>
-      <div class="zoombtns"><button onclick="zoomBy(1.6)">+</button><button onclick="zoomBy(1/1.6)">−</button><button onclick="zoomReset()">⟲</button></div>
-      <div class="mapstat mono" id="mapstat"></div>
+<section class="tab" id="start">
+  <p class="snapnote meta">This is a public snapshot. Install gpuroute and run <span class="mono">gpuroute ui</span> for your own live dashboard.</p>
+  <header class="head"><h2 class="big">Start<sup>(3 steps)</sup></h2>
+    <p class="lede">One command connects your agents, one shares a spare machine, then you just ask.</p></header>
+  <div class="rows steps">
+    <div class="row"><div class="idx">(01)</div>
+      <div><div class="name">Connect</div><div class="meta">Checks this machine and adds gpuroute to Claude Code and Codex, or prints the config for Cursor.</div></div>
+      <div class="cmds"><div class="cmd"><code id="c1">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute init</code><button class="copy" onclick="copy('c1',this)">Copy</button></div></div>
     </div>
-    <aside class="panel" id="panel"></aside>
+    <div class="row"><div class="idx">(02)</div>
+      <div><div class="name">Pool</div><div class="meta">Run the hub once to get your pool code. Anyone, anywhere (a friend’s gaming PC, a lab box, a teammate’s laptop) then joins with one command. It connects outbound, so there is no network setup. It only takes jobs while idle, and the owner sees each one.</div></div>
+      <div class="cmds">
+        <div class="cmd"><code id="c0">gpuroute hub</code><span class="meta">you, once: prints the pool code</span></div>
+        <div class="cmd"><code id="c2">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share --pool "&lt;pool code&gt;" --name &lt;name&gt;</code><button class="copy" onclick="copy('c2',this)">Copy</button></div>
+      </div>
+    </div>
+    <div class="row"><div class="idx">(03)</div>
+      <div><div class="name">Ask</div><div class="meta">Your agent calls <span class="mono">compute_map</span>, <span class="mono">run_workload</span>, <span class="mono">quote_job</span> and <span class="mono">launch_job</span> itself.</div></div>
+      <ul class="asks"><li>“What compute can you use right now?”</li><li>“Embed my notes on a GPU. Don’t hog my laptop.”</li><li>“Fine-tune Qwen2.5-0.5B on my data for under $1.”</li></ul>
+    </div>
   </div>
-  <p class="idx" style="margin-top:56px">(ORBITAL MARKET: COMPUTE + RELAY, NEXT 6 HOURS)</p>
-  <p class="lede" style="margin:8px 0 16px">Agents buy GPU time aboard satellites while they’re sunlit, plus ground-station passes to downlink results: <span class="mono">orbital_offers</span> → <span class="mono">book_orbital</span>. Windows and passes come from the real orbits. Operator listings and prices are mock, and jobs are emulated on ground GPUs.</p>
-  <div class="scroll"><table id="orbitt"></table></div>
-  <p class="meta" style="font-size:12px;margin-top:12px">Sources: ATLAS Global Data Center Map (6,131 facilities with coordinates) · Epoch AI Frontier Data Centers (CC BY 4.0; geocoded with OpenStreetMap Nominatim) · TeleGeography Submarine Cable Map · CelesTrak orbital elements (positions computed live with SGP4) · underwater sites from public reporting, locations approximate.</p>
 </section>
 
 <section class="tab" id="compute">
-  <h2 class="big">Compute<sup id="computecount"></sup></h2>
-  <p class="lede">Everything your agents can reach, and how busy it is right now. Agents see the same list through <span class="mono">compute_map</span>.</p>
+  <header class="head"><h2 class="big">Compute<sup id="computecount"></sup></h2>
+    <p class="lede">Everything your agents can reach, and how busy it is right now. Agents see the same list through <span class="mono">compute_map</span>.</p></header>
+  <div class="figs" id="computefigs"></div>
   <div id="maplist"></div>
-  <div class="two" style="margin-top:56px">
-    <div>
-      <p class="idx">(SHARE A MACHINE)</p>
-      <p style="font-size:22px;letter-spacing:-.02em;max-width:520px">Run this on any Mac or Linux box with a GPU. Jobs only start while it’s idle, each is capped at 30 minutes, and the owner sees every job.</p>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="cmd"><code id="sharecmd">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share</code><button class="copy" onclick="copy('sharecmd', this)">Copy</button></div>
-      <div class="cmd"><code>gpuroute join name@ip:7400#token</code><span class="meta">paste what it prints</span></div>
+  <div class="block"><h3>Share a machine</h3>
+    <div class="two">
+      <p>Run this on any Mac or Linux box with a GPU. Jobs only start while it is idle, each is capped at 30 minutes, and the owner sees every job.</p>
+      <div class="cmds">
+        <div class="cmd"><code id="sharecmd">uvx --from "git+https://github.com/sissississi-013/gpuroute#subdirectory=gpuroute" gpuroute share</code><button class="copy" onclick="copy('sharecmd', this)">Copy</button></div>
+        <div class="cmd"><code>gpuroute join name@ip:7400#token</code><span class="meta">paste what it prints</span></div>
+      </div>
     </div>
   </div>
 </section>
 
 <section class="tab" id="jobs">
-  <h2 class="big">Jobs<sup id="jobcount"></sup></h2>
-  <p class="lede">Anything your agents ran: training, embeddings, transcription, benchmarks. Outputs come back to this machine.</p>
-  <div class="cmd" style="max-width:640px;margin-bottom:40px"><code>gpuroute run my_script.py</code><span class="meta">deps are read from its imports</span></div>
+  <header class="head"><h2 class="big">Jobs<sup id="jobcount"></sup></h2>
+    <p class="lede">Anything your agents ran: training, embeddings, transcription, benchmarks. Outputs come back to this machine.</p></header>
+  <div id="jobsum"></div>
   <div id="jobsl"></div>
+  <div class="block"><h3>Run one yourself</h3>
+    <div class="cmd" style="max-width:640px;margin-top:6px"><code>gpuroute run my_script.py</code><span class="meta">dependencies are read from its imports</span></div></div>
 </section>
 
 <section class="tab" id="spend">
-  <h2 class="big">Spend</h2>
-  <p class="lede">Agents hold an allowance, never your credentials. Paid jobs above the threshold wait for you, and the budget becomes the provider’s hard timeout.</p>
-  <div class="figs" id="wallet"></div>
-  <div id="approvals" style="margin-top:48px"></div>
-  <p class="idx" style="margin-top:48px">(PROVIDERS)</p>
-  <div id="providers"></div>
-  <p class="idx" style="margin-top:56px">(PRICE A FINE-TUNE)</p>
-  <form class="q" id="qform">
-    <label>model<input name="model" value="Qwen/Qwen2.5-1.5B-Instruct"></label>
-    <label>method<select name="method"><option>lora</option><option>qlora</option><option>full</option></select></label>
-    <label>rows<input name="examples" value="2000" type="number"></label>
-    <label>seq len<input name="seq_len" value="512" type="number"></label>
-    <label>budget $<input name="budget" value="1" step="0.1" type="number"></label>
-    <button class="solid">Quote</button>
-  </form>
-  <p id="qsummary" class="meta" style="margin-top:16px"></p>
-  <div class="scroll"><table id="qtable"></table></div>
-  <p id="qnotes" class="meta" style="font-size:12px"></p>
+  <header class="head"><h2 class="big">Spend<sup id="spendmonth"></sup></h2>
+    <p class="lede">Agents hold an allowance, never your credentials. Paid jobs above the threshold wait for you, and the budget becomes the provider’s hard timeout.</p></header>
+  <div id="approvals"></div>
+  <div id="wallet"></div>
+  <div class="block"><h3>Providers</h3><div class="rows prov" id="providers"></div></div>
+  <div class="block"><h3>Price a fine-tune <span>estimate before you launch</span></h3>
+    <form class="q" id="qform">
+      <label>model<input name="model" value="Qwen/Qwen2.5-1.5B-Instruct"></label>
+      <label>method<select name="method"><option>lora</option><option>qlora</option><option>full</option></select></label>
+      <label>rows<input name="examples" value="2000" type="number"></label>
+      <label>sequence length<input name="seq_len" value="512" type="number"></label>
+      <label>budget, $<input name="budget" value="1" step="0.1" type="number"></label>
+      <button class="solid">Get quote</button>
+    </form>
+    <p id="qsummary" class="meta" style="margin:18px 0 6px"></p>
+    <div class="scroll"><table id="qtable"></table></div>
+    <p id="qnotes" class="meta" style="font-size:12px"></p>
+  </div>
 </section>
 
 <section class="tab" id="log">
-  <h2 class="big">Log</h2>
-  <p class="lede">Append-only record of every launch, refusal, approval and settlement.</p>
-  <div class="scroll"><table id="logt"></table></div>
+  <header class="head"><h2 class="big">Log<sup id="logcount"></sup></h2>
+    <p class="lede">Append-only record of every launch, refusal, approval and settlement. Times are UTC.</p></header>
+  <div class="tools"><div class="mixkey" id="logchips"></div></div>
+  <div id="logt"></div>
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = (x) => !x ? "$0" : x < 0.01 ? "$" + x.toFixed(4) : "$" + x.toFixed(2);
 const mins = (m) => m < 120 ? Math.round(m) + " min" : (m / 60).toFixed(1) + " h";
+const secs = (s) => s < 90 ? Math.round(s) + "s" : s < 5400 ? (s / 60).toFixed(1) + " min" : (s / 3600).toFixed(1) + " h";
 const pad = (i) => "(" + String(i).padStart(2, "0") + ")";
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 let MAP = [], STATE = null;
 const STATIC = !["127.0.0.1", "localhost"].includes(location.hostname);
-const SNAP = { "/api/state": "snapshot/state.json", "/api/map": "snapshot/map.json", "/api/orbit": "snapshot/orbit.json" };
+const SNAP = { "/api/state": "snapshot/state.json", "/api/map": "snapshot/map.json" };
 async function api(path) {
   if (STATIC) {
     const key = path.split("?")[0];
@@ -252,324 +327,221 @@ async function api(path) {
 if (STATIC) document.documentElement.classList.add("static");
 
 function route() {
-  const t = (location.hash || "#overview").slice(1);
-  if (t === "map") { drawWorld(); renderOrbit(); }
+  let t = (location.hash || "#overview").slice(1);
+  if (t === "map") return location.replace("map.html");  // the map is its own page now
+  if (!document.getElementById(t)) t = "overview";
+  document.body.dataset.tab = t;
   document.querySelectorAll("section.tab").forEach((s) => s.classList.toggle("on", s.id === t));
   document.querySelectorAll(".tabs a").forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + t));
+  scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
 function copy(id, btn) { navigator.clipboard.writeText($(id).textContent); btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy", 1200); }
+// only touch the DOM when the data changed, so polling never resets what you opened or scrolled
+const seen = {};
+function changed(key, data) { const s = JSON.stringify(data); if (seen[key] === s) return false; seen[key] = s; return true; }
 
-function renderCounters() {
-  const usable = MAP.filter((e) => e.available).length;
-  const market = MAP.find((e) => e.kind === "spare-GPU market");
-  const spare = market ? (parseInt(String(market.gpu)) || 0).toLocaleString() : "";
-  $("usable2").textContent = `(02)`;
-  $("usable2").title = `${usable} usable now · ${spare} spare market GPUs`;
-  $("livedot").classList.toggle("live", usable > 0);
-  $("computecount").textContent = `(${MAP.length})`;
+/* ---------- compute ---------- */
+const WORLD = ["frontier AI datacenters", "underwater"];
+function pillFor(e) {
+  if (e.available) return `<span class="pill go">${e.kind === "orbital" ? "bookable" : "usable"}</span>`;
+  if (e.online === false) return `<span class="pill stop">offline</span>`;
+  if (e.kind === "shared node") return `<span class="pill wait">busy</span>`;
+  if (WORLD.includes(e.kind)) return `<span class="pill mutec">not rentable</span>`;
+  if (e.kind === "spare-GPU market") return `<span class="pill mutec">quote only</span>`;
+  return `<span class="pill mutec">${e.kind === "cloud" ? "needs setup" : "by hand"}</span>`;
 }
-
+function loadBars(u) {
+  if (!u || u.gpu_util_pct == null) return "";
+  const bar = (label, v) => v == null ? "" : `<span>${label}</span><span class="track"><i class="${v >= 90 ? "hot" : ""}" style="width:${Math.min(100, v)}%"></i></span><b>${Math.round(v)}%</b>`;
+  return `<div class="load">${bar("gpu", u.gpu_util_pct)}${bar("cpu", u.cpu_load_pct)}</div>`;
+}
+function computeRow(e, i, big) {
+  return `<div class="row"><div class="idx">${pad(i)}</div>
+    <div><div class="name${big ? "" : " s"}">${esc(e.name)}</div><div class="meta">${esc(e.kind)}</div></div>
+    <div><div>${esc(e.gpu || "")}</div><div class="meta">${esc(e.note || "")}</div></div>
+    <div>${loadBars(e.utilization)}<div class="mono">${esc(e.cost)}</div></div>
+    <div class="end">${pillFor(e)}</div></div>`;
+}
 function renderMap() {
-  $("maplist").innerHTML = MAP.map((e, i) => {
-    const u = e.utilization || {};
-    const state = e.available ? `<span class="pill go">usable</span>` : e.online === false ? `<span class="pill stop">offline</span>`
-      : (e.kind === "shared node" ? `<span class="pill wait">busy</span>`
-      : ["frontier AI datacenters", "underwater", "orbital"].includes(e.kind) ? `<span class="pill mutec">not reachable</span>`
-      : `<span class="pill mutec">${e.kind === "cloud" ? "setup" : "manual"}</span>`);
-    const meter = u.gpu_util_pct != null ? `<div class="mono">gpu ${u.gpu_util_pct}% · cpu ${u.cpu_load_pct ?? "?"}%</div><div class="meter"><i style="width:${u.gpu_util_pct}%"></i></div>` : "";
-    return `<div class="row"><div class="idx">${pad(i + 1)}</div>
-      <div><div class="name">${esc(e.name)}</div><div class="meta">${esc(e.kind)}</div></div>
-      <div><div>${esc(e.gpu || "")}</div><div class="meta">${esc(e.note || "")}</div></div>
-      <div>${meter}<div class="mono" style="margin-top:6px">${esc(e.cost)}</div></div>
-      <div style="text-align:right">${state}</div></div>`;
-  }).join("");
+  if (!changed("map", MAP)) return;
+  const usable = MAP.filter((e) => e.available);
+  const world = MAP.filter((e) => !e.available && WORLD.includes(e.kind));
+  const step = MAP.filter((e) => !e.available && !WORLD.includes(e.kind));
+  const market = MAP.find((e) => e.kind === "spare-GPU market");
+  const spare = market ? parseInt(String(market.gpu)) || 0 : 0;
+  const frontier = MAP.find((e) => e.kind === "frontier AI datacenters");
+  const sites = frontier ? parseInt(String(frontier.gpu)) || 0 : 0;
+  $("computecount").textContent = `(${MAP.length})`;
+  $("livedot").classList.toggle("live", usable.length > 0);
+  $("livedot").title = `${usable.length} usable now`;
+  $("herolive").textContent = `${usable.length} usable right now` + (spare ? `, ${spare.toLocaleString()} more listed on the spare market.` : ".");
+  $("computefigs").innerHTML = [
+    [usable.length, "", `usable right now: ${usable.map((e) => esc(e.name)).join(", ") || "nothing yet"}`],
+    [step.length, "", "one step away: offline, by hand, or quote only"],
+    spare ? [spare.toLocaleString(), "", `spare GPUs listed on ${esc(market.name)} at live prices`] : null,
+    sites ? [sites, "", `frontier AI sites agents cannot rent. <a href="map.html">See them on the map</a>`] : null,
+  ].filter(Boolean).map(([n, unit, label]) => `<div><div class="figure">${n}<small>${unit}</small></div><div class="meta">${label}</div></div>`).join("");
+  let n = 0;
+  const group = (title, hint, list, big) => !list.length ? "" :
+    `<div class="block"><h3>${title} <span>${hint}</span></h3><div class="rows compute${big ? "" : " quiet"}">${list.map((e) => computeRow(e, ++n, big)).join("")}</div></div>`;
+  $("maplist").innerHTML =
+    group("Usable now", `${usable.length} of ${MAP.length}`, usable, true) +
+    group("One step away", "bring it online, or run it by hand", step, false) +
+    group("Out of reach", `<a href="map.html">on the map</a>`, world, false);
 }
 
+/* ---------- jobs ---------- */
+const WHERE = { "this machine": "#0d0d0c", "shared nodes": "#0f7350", "cloud": "#2f66d6" };
+const whereOf = (j) => j.provider === "local" ? "this machine" : String(j.provider).startsWith("node:") ? "shared nodes" : "cloud";
+const jobWhen = (id) => { const m = /^(\d\d)(\d\d)-(\d\d)(\d\d)/.exec(id || ""); return m ? `${MON[+m[1] - 1]} ${+m[2]}, ${m[3]}:${m[4]}` : ""; };
+const STATE_CLASS = { running: "wait", completed: "go", failed: "stop", denied: "stop", stopped_at_budget: "wait", pending_approval: "wait", cancelled: "mutec" };
+let JF = { state: "all", where: "all" };
+function setJF(k, v) { JF[k] = JF[k] === v ? "all" : v; seen.jobs = null; renderJobs(STATE.jobs); }
 function spark(vals) {
   if (!vals || vals.length < 2) return "";
   const w = 150, h = 40, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
   const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * (w - 4) + 2},${h - 4 - ((v - lo) / span) * (h - 8)}`);
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-label="loss curve"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="${pts.join(" ")}"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="loss curve"><polyline fill="none" stroke="currentColor" stroke-width="1.5" points="${pts.join(" ")}"/></svg>`;
 }
-const STATE_CLASS = { running: "wait", completed: "go", failed: "stop", denied: "stop", stopped_at_budget: "wait", pending_approval: "wait", cancelled: "mutec" };
-
-function renderJobs(jobs) {
-  const rest = jobs.filter((j) => j.state !== "pending_approval");
-  $("jobcount").textContent = `(${rest.length})`;
-  if (!rest.length) { $("jobsl").innerHTML = `<div class="empty">No jobs yet. Ask your agent to run something on a GPU.</div>`; return; }
-  $("jobsl").innerHTML = rest.map((j, i) => {
-    const p = j.progress, spent = j.actual_cost_usd ?? j.cost_so_far_usd ?? 0;
-    const prog = p && p.steps ? `<div class="meter" style="width:100%"><i style="width:${(100 * p.step / p.steps).toFixed(0)}%"></i></div><div class="mono">step ${p.step}/${p.steps} · loss ${p.loss}</div>` : "";
+function renderJobs(all) {
+  if (!changed("jobs", [all, JF])) return;
+  const jobs = all.filter((j) => j.state !== "pending_approval");
+  $("jobcount").textContent = `(${jobs.length})`;
+  if (!jobs.length) { $("jobsum").innerHTML = ""; $("jobsl").innerHTML = `<div class="empty">No jobs yet. Ask your agent to run something on a GPU.</div>`; return; }
+  const cost = (j) => j.actual_cost_usd ?? j.cost_so_far_usd ?? 0;
+  const sum = (f) => jobs.reduce((a, j) => a + (f(j) || 0), 0);
+  const done = jobs.filter((j) => j.state === "completed").length;
+  const spent = sum(cost), granted = sum((j) => j.budget_usd), gpu = sum((j) => j.gpu_seconds);
+  const free = jobs.filter((j) => !cost(j)).length;
+  const by = {}; jobs.forEach((j) => { (by[whereOf(j)] ||= []).push(j); });
+  const states = {}; jobs.forEach((j) => { states[j.state] = (states[j.state] || 0) + 1; });
+  $("jobsum").innerHTML = `<div class="figs">
+      <div><div class="figure">${done}<small>of ${jobs.length}</small></div><div class="meta">completed</div></div>
+      <div><div class="figure">${secs(gpu).replace(/ ?([a-z]+)$/, "<small>$1</small>")}</div><div class="meta">GPU time in total</div></div>
+      <div><div class="figure">${money(spent)}</div><div class="meta">spent, out of ${money(granted)} in budgets agents asked for</div></div>
+      <div><div class="figure">${free}</div><div class="meta">ran for $0 on your own or shared machines</div></div>
+    </div>
+    <div class="block"><h3>Where they ran <span>click to filter</span></h3>
+      <div class="mix" role="img" aria-label="${Object.keys(WHERE).filter((k) => by[k]).map((k) => `${k}: ${by[k].length} jobs`).join(", ")}">${Object.keys(WHERE).filter((k) => by[k]).map((k) => `<i style="flex:${by[k].length};background:${WHERE[k]}" title="${k}: ${by[k].length} jobs"></i>`).join("")}</div>
+      <div class="tools"><div class="mixkey">${Object.keys(WHERE).filter((k) => by[k]).map((k) => `<button class="chip${JF.where === k ? " on" : ""}" onclick="setJF('where','${k}')"><i style="background:${WHERE[k]}"></i>${k} <em>${by[k].length} · ${secs(by[k].reduce((a, j) => a + (j.gpu_seconds || 0), 0))} · ${money(by[k].reduce((a, j) => a + cost(j), 0))}</em></button>`).join("")}</div>
+      <div class="mixkey">${Object.entries(states).map(([s, n]) => `<button class="chip${JF.state === s ? " on" : ""}" onclick="setJF('state','${s}')">${s.replaceAll("_", " ")} <em>${n}</em></button>`).join("")}</div></div></div>`;
+  const shown = jobs.filter((j) => (JF.state === "all" || j.state === JF.state) && (JF.where === "all" || whereOf(j) === JF.where));
+  const maxS = Math.max(1, ...jobs.map((j) => j.gpu_seconds || 0));
+  $("jobsl").innerHTML = !shown.length ? `<div class="empty">No jobs match that filter.</div>` : `<div class="rows jobs">` + shown.map((j, i) => {
+    const p = j.progress, c = cost(j), err = String(j.error || "").trim();
+    const prog = p && p.steps ? `<div class="gpus" style="margin-bottom:6px"><span class="track"><i style="width:${(100 * p.step / p.steps).toFixed(0)}%"></i></span><span>step ${p.step}/${p.steps} · loss ${p.loss}</span></div>` : "";
+    const lines = err.split("\n").map((l) => l.replace(/[^\x20-\x7e]/g, " ").trim()).filter((l) => /[A-Za-z]{3}/.test(l));
+    const lastLine = lines.filter((l) => /error|exception|failed|denied|please/i.test(l)).pop() || lines.pop() || "";
     return `<div class="row"><div class="idx">${pad(i + 1)}</div>
-      <div><div class="name" style="font-size:clamp(22px,2.4vw,36px)">${esc(j.title || (j.model || "").split("/").pop())}</div>
-        <div class="meta">${esc(j.provider)} · ${esc(j.gpu_name || j.gpu)} · by ${esc(j.requested_by)}</div></div>
+      <div><div class="name s">${esc(j.title || (j.model || "").split("/").pop() || j.id)}</div>
+        <div class="meta">${esc(String(j.provider).replace(/^node:/, ""))} · ${esc(j.gpu_name || j.gpu)}</div>
+        <div class="meta">${esc(jobWhen(j.id))} · asked by ${esc(j.requested_by)}</div></div>
       <div>${prog}<div class="meta">${esc(j.data_leaving_device || "")}</div>
-        ${j.outputs && j.outputs.length ? `<div class="mono" style="margin-top:6px">→ ${j.outputs.map(esc).join(", ")}</div>` : ""}
-        ${j.error ? `<div class="meta stop">${esc(j.error).slice(0, 220)}</div>` : ""}</div>
-      <div><div class="mono">${Math.round(j.gpu_seconds || 0)}s GPU · ${money(spent)}</div>${spark(j.loss_curve)}</div>
-      <div style="text-align:right"><span class="pill ${STATE_CLASS[j.state] || "mutec"}">${j.state.replaceAll("_", " ")}</span>
-        ${j.state === "running" ? `<div style="margin-top:10px"><button onclick="act('cancel','${j.id}')">Stop</button></div>` : ""}</div></div>`;
-  }).join("");
+        ${j.outputs && j.outputs.length ? `<div class="out">→ ${j.outputs.map(esc).join(", ")}</div>` : ""}
+        ${err ? `<details><summary>${esc(lastLine.slice(0, 90)) || "error"}</summary><pre>${esc(err)}</pre></details>` : ""}</div>
+      <div><div class="gpus"><span class="track"><i style="width:${(100 * (j.gpu_seconds || 0) / maxS).toFixed(1)}%;background:${WHERE[whereOf(j)]}"></i></span><span>${secs(j.gpu_seconds || 0)} GPU</span></div>
+        <div class="mono" style="margin-top:6px">${money(c)}${j.budget_usd ? ` <span class="mutec">of ${money(j.budget_usd)} budget</span>` : ` <span class="mutec">free</span>`}</div>${spark(j.loss_curve)}</div>
+      <div class="end"><span class="pill ${STATE_CLASS[j.state] || "mutec"}">${j.state.replaceAll("_", " ")}</span>
+        ${j.state === "running" ? `<div style="margin-top:10px"><button class="act" onclick="act('cancel','${j.id}')">Stop</button></div>` : ""}</div></div>`;
+  }).join("") + `</div>`;
 }
 
+/* ---------- spend ---------- */
 function renderSpend(s) {
-  const w = s.wallet;
-  $("wallet").innerHTML = [["available", w.available_usd], ["spent", w.spent_usd], ["monthly cap", w.allowance_usd], ["approval above", w.approval_threshold_usd]]
-    .map(([k, v]) => `<div><div class="idx">${k}</div><div class="figure">${money(v)}</div></div>`).join("");
+  if (!changed("spend", [s.wallet, s.providers, s.jobs.filter((j) => j.state === "pending_approval")])) return;
+  const w = s.wallet, cap = w.allowance_usd || 1;
+  const m = /^(\d{4})-(\d\d)/.exec(w.month || "");
+  $("spendmonth").textContent = m ? `(${MON[+m[2] - 1]} ${m[1]})` : "";
+  const seg = (cls, v) => v > 0 ? `<i class="${cls}" style="flex:${v}" title="${cls === "sp" ? "spent" : cls === "rs" ? "reserved" : "available"} ${money(v)}"></i>` : "";
+  $("wallet").innerHTML = `<div class="wallet">
+      <div><div class="figure">${money(w.available_usd)}</div><div class="meta" style="margin-top:10px">left for agents to spend this month</div></div>
+      <div><div class="budget" role="img" aria-label="${money(w.spent_usd)} spent, ${money(w.reserved_usd)} reserved, ${money(w.available_usd)} available of ${money(cap)}">${seg("sp", w.spent_usd)}${seg("rs", w.reserved_usd)}${seg("av", w.available_usd)}</div>
+        <div class="scale"><span>$0</span><span>monthly cap ${money(cap)}</span></div>
+        <div class="facts">
+          <div><b>${money(w.spent_usd)}</b><span class="meta"><i style="background:var(--ink)"></i>spent</span></div>
+          <div><b>${money(w.reserved_usd)}</b><span class="meta"><i style="background:repeating-linear-gradient(135deg,var(--ink) 0 2px,var(--soft) 2px 5px)"></i>held by running jobs</span></div>
+          <div><b>${money(w.approval_threshold_usd)}</b><span class="meta">a job above this waits for your yes</span></div>
+          <div><b>${money(w.max_job_usd)}</b><span class="meta">the most one job may ever cost</span></div>
+        </div></div></div>`;
   const pending = s.jobs.filter((j) => j.state === "pending_approval");
-  $("approvals").innerHTML = pending.map((j) => `<div class="approval"><div>
+  $("approvals").innerHTML = pending.length ? `<h3 style="border-top-color:var(--wait)">Waiting for you <span>${pending.length}</span></h3>` + pending.map((j) => `<div class="approval"><div>
       <div style="font-size:22px;letter-spacing:-.02em"><b>${esc(j.requested_by)}</b> wants up to <b>${money(j.budget_usd)}</b> on ${esc(j.provider)} ${esc(j.gpu)}</div>
-      <div class="meta">${esc(j.model)} · est. ${money(j.est_cost_usd)}, ${mins(j.est_minutes || 0)} · ${esc(j.data_leaving_device)}</div></div>
-      <div style="display:flex;gap:8px"><button class="solid" onclick="act('approve','${j.id}')">Approve</button><button onclick="act('deny','${j.id}')">Deny</button></div></div>`).join("");
+      <div class="meta">${esc(j.model)}, estimated ${money(j.est_cost_usd)} and ${mins(j.est_minutes || 0)}. ${esc(j.data_leaving_device)}</div></div>
+      <div style="display:flex;gap:8px"><button class="solid act" onclick="act('approve','${j.id}')">Approve</button><button class="act" onclick="act('deny','${j.id}')">Deny</button></div></div>`).join("") + `<div style="height:36px"></div>` : "";
   $("providers").innerHTML = Object.entries(s.providers).map(([name, p], i) => {
-    let action = "", detail = esc(p.device || p.gpu || p.note || "");
+    let action = "", detail = [p.device || p.gpu, p.note].filter(Boolean).map(esc).join(" · ");
     if (p.ready === false && p.blocked_on === "payment_method") {
       detail = "One step: add a payment method. GPU use still comes out of Modal’s $30/mo free credits.";
-      action = `<a href="https://modal.com/settings/${esc(p.workspace)}/usage" target="_blank"><button class="solid">Open Modal</button></a> <button onclick="connect('${name}',this)">Verify</button>`;
-    } else if (p.ready == null) action = `<button onclick="connect('${name}',this)">Check</button>`;
+      action = `<a class="act" href="https://modal.com/settings/${esc(p.workspace)}/usage" target="_blank" rel="noopener"><button class="solid">Open Modal</button></a> <button class="act" onclick="connect('${name}',this)">Verify</button>`;
+    } else if (p.ready == null) action = `<button class="act" onclick="connect('${name}',this)">Check</button>`;
     const pill = p.ready ? `<span class="pill go">ready</span>` : p.ready === false ? `<span class="pill wait">needs you</span>` : `<span class="pill mutec">unchecked</span>`;
-    return `<div class="row" style="grid-template-columns:70px 1fr 2fr 240px"><div class="idx">${pad(i + 1)}</div><div class="name" style="font-size:32px">${esc(name)}</div>
-      <div><div>${pill}</div><div class="meta" style="margin-top:6px">${detail}</div></div><div style="text-align:right">${action}</div></div>`;
+    return `<div class="row"><div class="idx">${pad(i + 1)}</div><div class="name s">${esc(name)}</div>
+      <div class="meta">${detail}</div><div class="end">${action} ${pill}</div></div>`;
   }).join("");
 }
 
+/* ---------- log ---------- */
+let LF = "all";
+function setLF(v) { LF = LF === v ? "all" : v; seen.log = null; renderLog(STATE.log); }
+function sentence(e) {
+  const b = (x) => `<b>${esc(x)}</b>`;
+  switch (e.event) {
+    case "launched": return `${b(e.title || e.kind || "job")} on ${esc(String(e.provider || "").replace(/^node:/, "shared node "))}${e.gpu ? " " + esc(e.gpu) : ""}` +
+      `<span class="meta"> · ${e.budget_usd ? "budget " + money(e.budget_usd) : "free"} · stops after ${secs(e.hard_timeout_s || e.cap_s || 0)} · asked by ${esc(e.requested_by)}</span>`;
+    case "settled": return `${b(e.state)} for ${money(e.actual_cost_usd)}<span class="meta"> · ${e.budget_usd ? "budget " + money(e.budget_usd) + " · " : ""}${secs(e.gpu_seconds || 0)} GPU</span>`;
+    case "orbital_booked": return `${b(e.satellite)} for ${esc(e.minutes)} min<span class="meta"> · window ${esc(e.window)} · downlink ${esc(e.downlink)} · ${esc(e.operator)} · emulated on ${esc(e.emulated_on)}</span>`;
+    case "node_removed": return `${b(e.node)} left the pool`;
+    case "pool_created": return `Pool hub is up<span class="meta"> · ${esc(e.url)}</span>`;
+    case "provider_ready": return `${b(e.provider)} is ready<span class="meta"> · ${esc(e.gpu || "")}${e.workspace ? " · workspace " + esc(e.workspace) : ""}</span>`;
+    default: { const { ts, event, job, ...rest } = e;
+      return `<span class="mono">${esc(Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  "))}</span>`; }
+  }
+}
+const evDot = (e) => e.event === "launched" ? "launched" : e.event === "settled" ? (e.state === "completed" ? "ok" : "bad")
+  : e.event === "orbital_booked" ? "orbit" : /denied|refused|failed/.test(e.event) ? "bad" : /approved|ready/.test(e.event) ? "ok" : "";
 function renderLog(log) {
-  $("logt").innerHTML = `<tr><th>time (UTC)</th><th>event</th><th>detail</th></tr>` + log.map((e) => {
-    const { ts, event, ...rest } = e;
-    const d = Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join("  ");
-    return `<tr><td class="mono">${esc(ts.slice(5, 19).replace("T", " "))}</td><td>${esc(event.replaceAll("_", " "))}</td><td class="mono">${esc(d)}</td></tr>`;
-  }).join("");
-}
-
-/* ---------- world map (interactive) ---------- */
-let WORLD = null, orbitTimer = null, ZOOM = null, ZK = 1, SEL = null;
-const LAYERS = [
-  { id: "usable", label: "Usable now", color: "#2f7d5b", on: true },
-  { id: "orbit", label: "Orbit (live)", color: "#e8642c", on: true },
-  { id: "frontier", label: "Frontier AI sites", color: "#0d0d0c", on: true },
-  { id: "datacenters", label: "Datacenters", color: "#8a8880", on: true },
-  { id: "undersea", label: "Underwater DCs", color: "#3b6fd8", on: true },
-  { id: "cables", label: "Undersea cables", color: "#9db4ea", on: true },
-];
-const isOn = (id) => LAYERS.find((l) => l.id === id).on;
-async function loadWorld() {
-  if (WORLD) return WORLD;
-  const j = (u) => fetch(u).then((r) => r.json());
-  const [land, atlas, cables, epoch, undersea, orbit] = await Promise.all([
-    j("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json"), j("static/geo/atlas.json"), j("static/geo/cables.json"),
-    j("static/geo/epoch.json"), j("static/geo/undersea.json"), j("static/geo/orbit.json")]);
-  WORLD = { land: topojson.feature(land, land.objects.land), atlas, cables, epoch, undersea, orbit };
-  return WORLD;
-}
-function renderChips() {
-  $("chips").innerHTML = LAYERS.map((l) => `<span class="chip ${l.on ? "on" : ""}" onclick="toggleLayer('${l.id}')"><i style="background:${l.color}"></i>${l.label}</span>`).join("");
-}
-function toggleLayer(id) { const l = LAYERS.find((x) => x.id === id); l.on = !l.on; renderChips(); applyVisibility(); }
-function applyVisibility() { LAYERS.forEach((l) => d3.select("#world").selectAll(`.L-${l.id}`).style("display", l.on ? null : "none")); }
-function zoomBy(f) { d3.select("#world").transition().duration(350).call(ZOOM.scaleBy, f); }
-function zoomReset() { d3.select("#world").transition().duration(450).call(ZOOM.transform, d3.zoomIdentity); }
-let PROJ = null;
-function zoomTo(points) {
-  if (!points.length) return;
-  const xy = points.map((p) => PROJ(p)).filter(Boolean);
-  const [x0, x1] = d3.extent(xy, (d) => d[0]), [y0, y1] = d3.extent(xy, (d) => d[1]);
-  const k = Math.min(12, 0.8 / Math.max((x1 - x0 + 40) / 1600, (y1 - y0 + 40) / 820));
-  d3.select("#world").transition().duration(650).call(ZOOM.transform,
-    d3.zoomIdentity.translate(800, 410).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
-}
-function panel(html) { $("panel").innerHTML = html; }
-function agentQ(call) { return `<div class="idx" style="margin-top:16px">(YOUR AGENT ASKS)</div><div class="agentq">${esc(call)}</div>`; }
-function defaultPanel() {
-  const W = WORLD, mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
-  const totalMW = d3.sum(W.epoch, (d) => d.mw);
-  panel(`<div class="idx">(OVERVIEW)</div><h3>${W.atlas.length.toLocaleString()} datacenters, ${W.epoch.length} frontier AI sites, ${W.orbit.length} in orbit</h3>
-    <div class="kv"><div>usable now</div><div><b style="color:var(--go)">${mine.length}</b> machine${mine.length === 1 ? "" : "s"}: ${mine.map((e) => esc(e.name)).join(", ") || "this one"}</div>
-    <div>frontier power</div><div>${Math.round(totalMW).toLocaleString()} MW across ${W.epoch.length} sites</div>
-    <div>undersea</div><div>${W.cables.length} cables · ${W.undersea.length} underwater DCs</div>
-    <div>orbit</div><div>${W.orbit.map((o) => esc(o.name)).join(", ")}: bookable via book_orbital (mock market)</div></div>
-    <p class="meta">Click anything on the map, or search. Scroll to zoom, drag to pan.</p>
-    ${agentQ('world_compute(near="frankfurt", radius_km=100)')}`);
-}
-function selectItem(kind, d) {
-  SEL = { kind, d };
-  if (kind === "dc") panel(`<div class="idx">(DATACENTER · ATLAS)</div><h3>${esc(d[2])}</h3>
-      <div class="kv"><div>operator</div><div>${esc(d[3] || "—")}</div><div>city</div><div>${esc(d[4] || "—")}</div><div>country</div><div>${esc(d[5] || "—")}</div>
-      <div>agent access</div><div>colocation: rentable by contract, not by API</div></div>
-      ${agentQ(`world_compute(layer="datacenters", lat=${d[1]}, lon=${d[0]}, radius_km=50)`)}`);
-  if (kind === "frontier") panel(`<div class="idx">(FRONTIER AI SITE · EPOCH AI)</div><h3>${esc(d.name)}</h3>
-      <div class="kv"><div>owner</div><div>${esc(d.owner)}</div><div>power</div><div>${Math.round(d.mw)} MW</div>
-      <div>compute</div><div>${Math.round(d.h100e).toLocaleString()} H100-equivalents</div><div>country</div><div>${esc(d.country)}</div>
-      <div>agent access</div><div>private: not rentable</div></div>
-      ${agentQ(`world_compute(layer="frontier", owner="${(d.owner || "").split(" ")[0]}")`)}`);
-  if (kind === "undersea") panel(`<div class="idx">(UNDERWATER DATACENTER)</div><h3>${esc(d.name)}</h3>
-      <div class="kv"><div>status</div><div>${esc(d.status)}</div><div>what</div><div>${esc(d.what)}</div><div>location</div><div>approximate (public reporting)</div>
-      <div>agent access</div><div>not rentable</div></div>${agentQ('world_compute(layer="undersea")')}`);
-  if (kind === "usable") panel(`<div class="idx">(USABLE NOW)</div><h3>Your agent can run here</h3>
-      <div class="kv">${d.map((e) => `<div>${esc(e.name)}</div><div>${esc(e.gpu)} · ${e.available ? "idle" : "busy"}</div>`).join("")}</div>
-      ${agentQ('run_workload("embed.py", target="auto")')}`);
-  if (kind === "sat") {
-    api("/api/orbit").then((o) => {
-      const mine = o.offers.filter((x) => x.satellite === d.name);
-      const pos = mine.find((x) => x.type === "position") || {};
-      const comp = mine.filter((x) => x.type === "compute").slice(0, 3), rel = mine.filter((x) => x.type === "relay").slice(0, 3);
-      panel(`<div class="idx">(ORBITAL COMPUTE · LIVE)</div><h3>${esc(d.name)}</h3>
-        <div class="kv"><div>now</div><div>${pos.alt_km} km up · ${pos.lat}, ${pos.lon} · ${pos.sunlit_now ? "☀ sunlit" : "in eclipse"}</div>
-        <div>hardware</div><div>${esc(d.what)}</div></div>
-        <div class="idx">(COMPUTE WINDOWS)</div>${comp.map((c) => `<div class="res">${esc(c.offer_id)} · ${esc(c.window)}<div class="meta">${esc(c.hardware)} · $${c.usd_per_gpu_min}/GPU-min · downlink ${esc(c.next_downlink)}</div></div>`).join("")}
-        <div class="idx" style="margin-top:12px">(DOWNLINK PASSES)</div>${rel.map((r) => `<div class="res">${esc(r.operator.replace(" (mock listing)", ""))} · ${esc(r.window)}<div class="meta">${r.capacity_gb} GB · ${r.max_elevation_deg}° max</div></div>`).join("")}
-        <p class="meta" style="font-size:12px">Orbits and passes are live (SGP4). Listings and prices are mock.</p>
-        ${agentQ(comp[0] ? `book_orbital("${comp[0].offer_id}", "benchmark.py", budget_usd=1)` : 'orbital_offers()')}`);
-    });
-  }
-}
-function doSearch(q) {
-  q = q.trim().toLowerCase();
-  const g = d3.select("#world");
-  g.selectAll(".hit").classed("hit", false).attr("r", null);
-  if (q.length < 2) { g.selectAll(".dc").attr("fill-opacity", .35); defaultPanel(); return; }
-  const W = WORLD;
-  const dcs = W.atlas.filter((r) => [r[2], r[3], r[4], r[5]].some((f) => (f || "").toLowerCase().includes(q)));
-  const fr = W.epoch.filter((d) => [d.name, d.owner, d.country].some((f) => (f || "").toLowerCase().includes(q)));
-  const set = new Set(dcs);
-  g.selectAll(".dc").attr("fill-opacity", (d) => set.has(d) ? .9 : .06).attr("fill", (d) => set.has(d) ? "#2f7d5b" : "#0d0d0c");
-  const ops = d3.rollups(dcs, (v) => v.length, (r) => r[3] || "?").sort((a, b) => b[1] - a[1]).slice(0, 6);
-  panel(`<div class="idx">(SEARCH)</div><h3>“${esc(q)}”</h3>
-    <div class="kv"><div>datacenters</div><div>${dcs.length}</div><div>frontier AI</div><div>${fr.length}</div>
-    <div>top operators</div><div>${ops.map(([o, n]) => `${esc(o)} (${n})`).join(", ") || "—"}</div></div>
-    ${fr.slice(0, 5).map((d, i) => `<div class="res" onclick="selectItem('frontier', WORLD.epoch.filter(x=>x.name===${JSON.stringify(d.name).replaceAll('"', "&quot;")})[0])">${esc(d.name)} · ${Math.round(d.mw)} MW</div>`).join("")}
-    ${dcs.slice(0, 12).map((r) => `<div class="res">${esc(r[2])}<div class="meta">${esc(r[3])} · ${esc(r[4])}, ${esc(r[5])}</div></div>`).join("")}
-    ${agentQ(`world_compute(search="${q}")`)}`);
-  zoomTo([...dcs.map((r) => [r[0], r[1]]), ...fr.map((d) => [d.lon, d.lat])].slice(0, 400));
-}
-async function drawWorld() {
-  const W = await loadWorld();
-  if (!MAP.length) { try { MAP = await api("/api/map"); } catch (e) {} }
-  renderChips();
-  const svg = d3.select("#world"); svg.selectAll("*").remove();
-  const proj = d3.geoEqualEarth().fitExtent([[10, 10], [1590, 810]], { type: "Sphere" });
-  PROJ = proj;
-  const path = d3.geoPath(proj);
-  const tip = $("tip");
-  const show = (ev, html) => { tip.innerHTML = html; tip.style.display = "block";
-    const r = $("world").getBoundingClientRect(); tip.style.left = (ev.clientX - r.left + 14) + "px"; tip.style.top = (ev.clientY - r.top + 14) + "px"; };
-  const hide = () => tip.style.display = "none";
-  const root = svg.append("g");
-  root.append("path").attr("d", path({ type: "Sphere" })).attr("fill", "#fff").attr("stroke", "#0d0d0c").attr("stroke-width", 1).attr("vector-effect", "non-scaling-stroke");
-  root.append("path").attr("d", path(d3.geoGraticule10())).attr("fill", "none").attr("stroke", "#eceae4").attr("stroke-width", .6).attr("vector-effect", "non-scaling-stroke");
-  root.append("path").attr("d", path(W.land)).attr("fill", "#ecebe6");
-  root.append("g").attr("class", "L-cables").selectAll("path").data(W.cables).join("path")
-    .attr("d", (c) => path({ type: "MultiLineString", coordinates: c.g[0] && typeof c.g[0][0] === "number" ? [c.g] : c.g }))
-    .attr("fill", "none").attr("stroke", "#3b6fd8").attr("stroke-opacity", .25).attr("stroke-width", .8).attr("vector-effect", "non-scaling-stroke")
-    .on("mousemove", (ev, c) => show(ev, `<b>${esc(c.n)}</b><br>undersea cable`)).on("mouseleave", hide);
-  root.append("g").attr("class", "L-datacenters").selectAll("circle").data(W.atlas).join("circle").attr("class", "dc pt")
-    .attr("cx", (d) => proj(d)[0]).attr("cy", (d) => proj(d)[1]).attr("r", 1.3).attr("fill", "#0d0d0c").attr("fill-opacity", .35)
-    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d[2])}</b><br>${esc(d[3])} · ${esc(d[4])}, ${esc(d[5])}`)).on("mouseleave", hide)
-    .on("click", (ev, d) => selectItem("dc", d));
-  const rs = d3.scaleSqrt().domain([0, d3.max(W.epoch, (d) => d.mw) || 1]).range([2.5, 22]);
-  root.append("g").attr("class", "L-frontier").selectAll("circle").data(W.epoch).join("circle").attr("class", "pt")
-    .attr("cx", (d) => proj([d.lon, d.lat])[0]).attr("cy", (d) => proj([d.lon, d.lat])[1]).attr("r", (d) => rs(d.mw)).attr("data-r", (d) => rs(d.mw))
-    .attr("fill", "#0d0d0c").attr("fill-opacity", .1).attr("stroke", "#0d0d0c").attr("stroke-width", 1).attr("vector-effect", "non-scaling-stroke")
-    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d.name)}</b><br>${esc(d.owner)} · ${Math.round(d.mw)} MW`)).on("mouseleave", hide)
-    .on("click", (ev, d) => selectItem("frontier", d));
-  const u = root.append("g").attr("class", "L-undersea").selectAll("g").data(W.undersea).join("g").attr("class", "sym")
-    .attr("data-x", (d) => proj([d.lon, d.lat])[0]).attr("data-y", (d) => proj([d.lon, d.lat])[1])
-    .on("mousemove", (ev, d) => show(ev, `<b>${esc(d.name)}</b><br>${esc(d.status)}`)).on("mouseleave", hide).on("click", (ev, d) => selectItem("undersea", d));
-  u.append("circle").attr("r", 9).attr("fill", "#fff").attr("stroke", "#3b6fd8").attr("stroke-width", 2);
-  u.append("circle").attr("r", 3).attr("fill", "#3b6fd8");
-  u.append("text").text((d) => d.name.split(" (")[0].replace(" data center", "").replace(" underwater", "")).attr("x", 13).attr("y", 4)
-    .attr("font-size", 13).attr("font-family", "Inter, sans-serif").attr("fill", "#3b6fd8");
-  const mine = MAP.filter((e) => (e.kind === "this machine" || e.kind === "shared node") && e.online !== false);
-  const here = proj([-122.399, 37.786]);
-  const ug = root.append("g").attr("class", "L-usable sym").attr("data-x", here[0]).attr("data-y", here[1])
-    .on("mousemove", (ev) => show(ev, `<b>Usable now</b><br>${mine.map((e) => esc(e.name)).join(" + ")}`)).on("mouseleave", hide)
-    .on("click", () => selectItem("usable", mine));
-  ug.append("circle").attr("r", 16).attr("fill", "#2f7d5b").attr("fill-opacity", .18);
-  ug.append("circle").attr("r", 6).attr("fill", "#2f7d5b");
-  ug.append("text").text(`you: ${mine.map((e) => e.name).join(" + ") || "this machine"}`).attr("x", -14).attr("y", -20).attr("text-anchor", "end")
-    .attr("font-size", 15).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#2f7d5b");
-  const og = root.append("g").attr("class", "L-orbit");
-  function placeSyms() {
-    svg.selectAll(".sym").attr("transform", function () { return `translate(${this.dataset.x},${this.dataset.y}) scale(${1 / ZK})`; });
-    svg.selectAll(".dc").attr("r", 1.3 / Math.sqrt(ZK));
-    svg.selectAll(".L-frontier circle").attr("r", function () { return this.dataset.r / Math.sqrt(ZK); });
-  }
-  function drawOrbit() {
-    og.selectAll("*").remove();
-    const now = new Date();
-    W.orbit.forEach((o) => {
-      const rec = satellite.twoline2satrec(o.tle[1], o.tle[2]);
-      const pos = (t) => { const pv = satellite.propagate(rec, t); if (!pv.position) return null;
-        const g = satellite.eciToGeodetic(pv.position, satellite.gstime(t));
-        return [satellite.degreesLong(g.longitude), satellite.degreesLat(g.latitude), g.height]; };
-      const track = []; for (let m = -45; m <= 45; m += 1) { const p = pos(new Date(+now + m * 60000)); if (p) track.push(p.slice(0, 2)); }
-      og.append("path").attr("d", path({ type: "LineString", coordinates: track })).attr("fill", "none")
-        .attr("stroke", "#e8642c").attr("stroke-width", 1.5).attr("stroke-dasharray", "4 4").attr("vector-effect", "non-scaling-stroke");
-      const p = pos(now); if (!p) return;
-      const xy = proj(p.slice(0, 2));
-      const g = og.append("g").attr("class", "sym").attr("data-x", xy[0]).attr("data-y", xy[1]).style("cursor", "pointer")
-        .on("mousemove", (ev) => show(ev, `<b>${esc(o.name)}</b> · ${Math.round(p[2])} km up<br>click for compute windows + downlinks`)).on("mouseleave", hide)
-        .on("click", () => selectItem("sat", o));
-      g.append("circle").attr("r", 14).attr("fill", "#e8642c").attr("fill-opacity", .18);
-      g.append("circle").attr("r", 7).attr("fill", "#e8642c");
-      g.append("text").text(o.name).attr("x", 12).attr("y", 4).attr("font-size", 14).attr("font-weight", 600).attr("font-family", "Inter, sans-serif").attr("fill", "#e8642c");
-    });
-    placeSyms(); applyVisibility();
-  }
-  ZOOM = d3.zoom().scaleExtent([1, 14]).translateExtent([[0, 0], [1600, 820]]).on("zoom", (ev) => {
-    root.attr("transform", ev.transform); ZK = ev.transform.k; placeSyms();
-    $("mapstat").textContent = `zoom ${ZK.toFixed(1)}×`;
-  });
-  svg.call(ZOOM);
-  drawOrbit(); clearInterval(orbitTimer); orbitTimer = setInterval(() => { if (location.hash === "#map") drawOrbit(); }, 3000);
-  applyVisibility();
-  $("mapstat").textContent = "scroll to zoom · drag to pan · click anything";
-  if (!SEL) defaultPanel();
-  const q0 = new URLSearchParams(location.search).get("q");
-  if (q0 && !SEL) { $("msearch").value = q0; doSearch(q0); }
-}
-let searchT = null;
-document.addEventListener("input", (ev) => { if (ev.target.id === "msearch") { clearTimeout(searchT); searchT = setTimeout(() => doSearch(ev.target.value), 220); } });
-
-async function renderOrbit() {
-  try {
-    const o = await api("/api/orbit");
-    $("orbitt").innerHTML = `<tr><th>offer</th><th>satellite</th><th>type</th><th>operator</th><th>window</th><th>what you get</th><th>price</th></tr>` +
-      o.offers.filter((x) => x.type !== "position").map((x) => `<tr>
-        <td class="mono">${esc(x.offer_id)}</td><td>${esc(x.satellite)}</td>
-        <td>${x.type === "compute" ? `<span class="pill" style="color:#e8642c">compute</span>` : `<span class="pill" style="color:#3b6fd8">relay</span>`}</td>
-        <td class="meta">${esc(x.operator)}</td><td class="mono">${esc(x.window)}</td>
-        <td>${x.type === "compute" ? `${esc(x.hardware)}, ${x.minutes} min, ${esc(x.power)}<div class="meta">downlink: ${esc(x.next_downlink)}</div>` : `${x.capacity_gb} GB down · ${x.max_elevation_deg}° max elevation`}</td>
-        <td class="mono">${x.type === "compute" ? "$" + x.usd_per_gpu_min + "/GPU-min" : "$" + x.usd_per_gb + "/GB"}</td></tr>`).join("");
-  } catch (e) {}
+  if (!changed("log", [log, LF])) return;
+  $("logcount").textContent = `(${log.length})`;
+  const counts = {}; log.forEach((e) => { counts[e.event] = (counts[e.event] || 0) + 1; });
+  $("logchips").innerHTML = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `<button class="chip${LF === k ? " on" : ""}" onclick="setLF('${esc(k)}')">${esc(k.replaceAll("_", " "))} <em>${n}</em></button>`).join("");
+  const shown = log.filter((e) => LF === "all" || e.event === LF);
+  if (!shown.length) { $("logt").innerHTML = `<div class="empty">Nothing logged yet.</div>`; return; }
+  const days = []; shown.forEach((e) => { const d = e.ts.slice(0, 10); if (!days.length || days.at(-1)[0] !== d) days.push([d, []]); days.at(-1)[1].push(e); });
+  $("logt").innerHTML = days.map(([d, list], i) => `<div class="${i ? "day" : ""}"><h3>${MON[+d.slice(5, 7) - 1]} ${+d.slice(8, 10)}, ${d.slice(0, 4)} <span>${list.length} event${list.length === 1 ? "" : "s"}</span></h3>
+    <div class="rows log">${list.map((e) => `<div class="row"><div class="idx">${esc(e.ts.slice(11, 19))}</div>
+      <div class="ev"><i class="${evDot(e)}"></i>${esc(e.event.replaceAll("_", " "))}</div>
+      <div class="what">${sentence(e)}</div><div class="idx">${esc(e.job || "")}</div></div>`).join("")}</div></div>`).join("");
 }
 
 async function act(kind, id) { await fetch(`/api/${kind}?job=${encodeURIComponent(id)}`, { method: "POST" }); refresh(); }
-async function connect(name, btn) { btn.disabled = true; btn.textContent = "checking…"; await fetch(`/api/connect?provider=${name}`, { method: "POST" }); refresh(); }
+async function connect(name, btn) { btn.disabled = true; btn.textContent = "checking…"; await fetch(`/api/connect?provider=${name}`, { method: "POST" }); seen.spend = null; refresh(); }
 
 async function refresh() {
-  try {
-    STATE = await api("/api/state");
-    renderJobs(STATE.jobs); renderSpend(STATE); renderLog(STATE.log); renderCounters();
-    $("clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch (e) { $("clock").textContent = "offline"; }
+  try { STATE = await api("/api/state"); renderJobs(STATE.jobs); renderSpend(STATE); renderLog(STATE.log); } catch (e) {}
 }
 async function refreshMap() {
-  try { MAP = await api("/api/map"); renderMap(); renderCounters(); } catch (e) {}
+  try { MAP = await api("/api/map"); renderMap(); } catch (e) {}
 }
 
 $("qform").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  $("qsummary").textContent = "pricing…"; $("qtable").innerHTML = "";
-  const q = await api("/api/quote?" + new URLSearchParams(new FormData(ev.target)));
+  $("qsummary").textContent = "Pricing…"; $("qtable").innerHTML = ""; $("qnotes").textContent = "";
+  let q;
+  try { q = await api("/api/quote?" + new URLSearchParams(new FormData(ev.target))); } catch (e) { $("qsummary").textContent = "Could not reach the pricing service. Try again."; return; }
   if (q.error) { $("qsummary").textContent = q.error; return; }
-  const e = q.estimate, rec = q.recommended_launch;
-  $("qsummary").innerHTML = `Needs <b>${e.vram_needed_gb} GB</b> VRAM · ${e.tokens.toLocaleString()} tokens · ${esc(e.assumptions)}`;
+  const e = q.estimate, rec = q.recommended_launch, opts = q.options.slice(0, 12);
+  const maxT = Math.max(...opts.map((o) => o.est_minutes)), maxC = Math.max(...opts.map((o) => o.cost_usd)) || 1;
+  $("qsummary").innerHTML = `Needs <b style="color:var(--ink)">${e.vram_needed_gb} GB</b> of GPU memory for ${e.tokens.toLocaleString()} tokens. ${esc(e.assumptions)}.` +
+    (STATIC ? " This snapshot shows one saved quote." : "");
   $("qtable").innerHTML = `<tr><th>where</th><th>GPU</th><th>time</th><th>cost</th><th>you pay</th><th></th></tr>` +
-    q.options.slice(0, 12).map((o) => {
+    opts.map((o) => {
       const isRec = rec && o.provider === rec.provider && o.gpu === rec.gpu;
-      return `<tr><td>${esc(o.provider)}${isRec ? ` <span class="pill go">pick</span>` : ""}</td><td class="mono">${esc(o.gpu)}</td><td class="mono">${mins(o.est_minutes)}</td>
-        <td class="mono">${money(o.cost_usd)}</td><td class="mono">${money(o.out_of_pocket_usd)}</td><td class="meta">${esc(o.note || o.needs || (o.available_now ? o.available_now + " available" : ""))}</td></tr>`;
+      return `<tr class="${isRec ? "rec" : ""}"><td>${esc(o.provider)}${isRec ? ` <span class="pill go">best pick</span>` : ""}</td><td class="num">${esc(o.gpu)}</td>
+        <td class="num"><span class="track"><i style="width:${(100 * o.est_minutes / maxT).toFixed(1)}%"></i></span>${mins(o.est_minutes)}</td>
+        <td class="num"><span class="track"><i style="width:${(100 * o.cost_usd / maxC).toFixed(1)}%"></i></span>${money(o.cost_usd)}</td>
+        <td class="num">${money(o.out_of_pocket_usd)}</td><td class="meta">${esc(o.note || o.needs || (o.available_now ? o.available_now + " available" : ""))}</td></tr>`;
     }).join("");
   $("qnotes").innerHTML = q.notes.map(esc).join("<br>");
 });

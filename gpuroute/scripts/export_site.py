@@ -12,6 +12,7 @@ pkg = Path(ui.__file__).parent
 shutil.rmtree(out, ignore_errors=True)
 (out / "snapshot").mkdir(parents=True)
 shutil.copy(pkg / "templates" / "ui.html", out / "index.html")
+shutil.copy(pkg / "templates" / "map.html", out / "map.html")
 shutil.copytree(pkg / "static", out / "static")
 
 
@@ -28,5 +29,6 @@ state["log"] = [e for e in state["log"] if e["event"] not in ("node_added", "nod
                                                               budget_usd=1.0)))
 from gpuroute import orbital
 (out / "snapshot" / "orbit.json").write_text(json.dumps(orbital.offers(6)))
+(out / "snapshot" / "market.json").write_text(json.dumps(ui.market()))
 (out / "vercel.json").write_text(json.dumps({"cleanUrls": True}))
 print("exported to", out)

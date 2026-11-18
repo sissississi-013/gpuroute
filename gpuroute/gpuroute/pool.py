@@ -27,7 +27,8 @@ def hub_nodes():
     if not pool_conf():
         return []
     try:
-        return _hub("GET", "/nodes", timeout=8).json()
+        r = _hub("GET", "/nodes", timeout=8).json()
+        return r if isinstance(r, list) else []  # a stale pool secret returns an error object, not nodes
     except Exception:
         return []
 

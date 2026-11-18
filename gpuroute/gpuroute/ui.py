@@ -14,6 +14,13 @@ from . import data, jobs, ledger, providers
 from .quote import quote
 
 PAGE = Path(__file__).parent / "templates" / "ui.html"
+MAP_PAGE = Path(__file__).parent / "templates" / "map.html"
+
+
+def market():
+    """Ground stations and (mock) operator listings the standalone map needs to draw the orbit timeline."""
+    from . import orbital
+    return {"operators": orbital.OPERATORS, "stations": orbital.STATIONS, "min_elev": orbital.MIN_ELEV}
 
 
 def state():
@@ -41,6 +48,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/":
                 return self.send(PAGE.read_bytes(), "text/html; charset=utf-8")
+            if u.path in ("/map", "/map.html"):
+                return self.send(MAP_PAGE.read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/market":
+                return self.send(market())
             if u.path.startswith("/static/"):
                 rel = Path(u.path[len("/static/"):])
                 if ".." not in rel.parts:
